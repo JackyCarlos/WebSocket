@@ -11,5 +11,5 @@ typedef struct {
 void sha1Init(sha1Context *);
 void sha1ProcessBlock(sha1Context *);
 void sha1PadMessage(sha1Context *);
-void sha1Input(uint8_t *message, sha1Context *);
+void sha1Input(uint8_t *, uint32_t messageLength, sha1Context *);
 void sha1Output(sha1Context *);
