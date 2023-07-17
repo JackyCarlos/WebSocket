@@ -23,13 +23,18 @@ void sha1Init(sha1Context *context)
 void sha1Input(uint8_t *message, uint32_t messageLength, sha1Context *context) 
 {
 	int i;
+	context->index = 0;
+
 	for (i = 0; i < messageLength; i++) {
-		if (i && i % 64 == 0)
-			sha1ProcessBlock(context);
+		context->messageBlock[context->index] = *message++;
 		
-		context->index++;
-		context->messageBlock[i % 64] = *message++;	
+		if (context->index == 63)
+			sha1ProcessBlock(context);
+		else 
+			context->index++;
 	}
+
+	sha1padMessage(context);
 
 	
 } 
