@@ -1,15 +1,15 @@
 #include "sha1.h"
 
+static uint32_t shiftLeft(uint32_t, const int);
+static void generateWords(uint8_t [], uint32_t []);
+static uint32_t f1(uint32_t, uint32_t, uint32_t);
+static uint32_t f2(uint32_t, uint32_t, uint32_t);
+static uint32_t f3(uint32_t, uint32_t, uint32_t);
+
 static const uint32_t K1 = 0x5a827999;
 static const uint32_t K2 = 0x6ed9eba1;
 static const uint32_t K3 = 0x8f1bbcdc;
 static const uint32_t K4 = 0xca62c1d6;
-
-int main(int argc, char *argv[])
-{
-	sha1context *test;
-	return 0;
-}
 
 void sha1Init(sha1Context *context) 
 {
@@ -28,7 +28,7 @@ void sha1Input(uint8_t *message, uint32_t messageLength, sha1Context *context)
 			sha1ProcessBlock(context);
 		
 		context->index++;
-		context->messageBlock[i % 64] = *message;	
+		context->messageBlock[i % 64] = *message++;	
 	}
 
 	
@@ -54,7 +54,7 @@ void sha1ProcessBlock(sha1Context *context)
 		A = E + f1(B, C, D) + shiftLeft(A, 5) + messageWords[i] + K1;
 		E = D;
 		D = C;
-		C = shiftLeft(B, 20);
+		C = shiftLeft(B, 30);
 		B = temp;
 	}
 	
@@ -63,7 +63,7 @@ void sha1ProcessBlock(sha1Context *context)
 		A = E + f2(B, C, D) + shiftLeft(A, 5) + messageWords[i] + K2;
 		E = D;
 		D = C;
-		C = shiftLeft(B, 20);
+		C = shiftLeft(B, 30);
 		B = temp;
 	} 
 	
@@ -72,7 +72,7 @@ void sha1ProcessBlock(sha1Context *context)
 		A = E + f3(B, C, D) + shiftLeft(A, 5) + messageWords[i] + K3;
 		E = D;
 		D = C;
-		C = shiftLeft(B, 20);
+		C = shiftLeft(B, 30);
 		B = temp;
 	} 
 	
@@ -81,7 +81,7 @@ void sha1ProcessBlock(sha1Context *context)
 		A = E + f2(B, C, D) + shiftLeft(A, 5) + messageWords[i] + K4;
 		E = D;
 		D = C;
-		C = shiftLeft(B, 20);
+		C = shiftLeft(B, 30);
 		B = temp;
 	}
 	
@@ -93,7 +93,7 @@ void sha1ProcessBlock(sha1Context *context)
 		
 }
 
-static uint32_t shiftLeft(const uint32_t val, const int x)
+static uint32_t shiftLeft(uint32_t val, const int x)
 {
 	return val << x | val >> 32 - x;
 }
@@ -107,15 +107,27 @@ static void generateWords(uint8_t inputBytes[], uint32_t messageWords[])
 
 	for (i = 0; i < 64; i++) {
 		shiftValue = (uint32_t) inputBytes[i] << 24 - (i % 4) * 8; 
-		messageWords[i/4] |= shiftvalue;
+		messageWords[i/4] |= shiftValue;
 	}
 	
-	for (i = 16; i < 80)
+	for (i = 16; i < 80; i++)
 		messageWords[i] = shiftLeft(messageWords[i - 16] ^ messageWords[i - 14] ^ messageWords[i - 8] ^ messageWords[i - 3], 1);
 }
 
+static uint32_t f1(uint32_t B, uint32_t C, uint32_t D) 
+{
+	return B & C | ~B & D;
+}
 
+static uint32_t f2 (uint32_t B, uint32_t C, uint32_t D) 
+{
+	return B ^ C ^ D;
+}
 
+static uint32_t f3(uint32_t B, uint32_t C, uint32_t D) 
+{
+	return B & C | B & D | C & D;
+}
 
 
 
