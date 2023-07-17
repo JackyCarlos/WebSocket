@@ -18,13 +18,14 @@ void sha1Init(sha1Context *context)
 	context->intermediateHash[2] = 0x98badcfe;
 	context->intermediateHash[3] = 0x10325476;
 	context->intermediateHash[4] = 0xc3d2e1f0;
+	
+	context->index = 0;
 }
 
 void sha1Input(uint8_t *message, uint64_t messageLength, sha1Context *context) 
 {
 	int i;
 	context->messageLength = messageLength * 8;
-	context->index = 0;
 
 	for (i = 0; i < messageLength; i++) {
 		context->messageBlock[context->index] = *message++;
@@ -95,27 +96,28 @@ void sha1ProcessBlock(sha1Context *context)
 	context->intermediateHash[3] += D;
 	context->intermediateHash[4] += E;
 
-	context->index = 0;
-		
+	context->index = 0;		
 }
 
 void sha1PadMessage(sha1Context *context)
 {
 	int i;
 	
-	context->messageBlock[context->index++] = (unsigned char) 1 << 7;
+	context->messageBlock[context->index++] = 0x80;
 
-	if (context->index <= 56) {
-		while (context->index < 56) {
-			context->messageBlock[context->index] = (unsigned char) 0;
-			context->index++;
-		}
-		
-		// 8 byte message length stuff
+	if (context->index > 56) {
+		for (i = context->index; i < 64; i++)
+			context->message[context->index++]
 		
 		sha1ProcessBlock(context);
-		return;
 	}
+
+	for (i = context->index; i < 56; i++)
+		context->messageBlock[context->index++] = 0;
+
+	// message length to bytes functionality
+
+	sha1ProcessBlock(context);	
 }
 
 static uint32_t shiftLeft(uint32_t val, const int x)
@@ -153,6 +155,4 @@ static uint32_t f3(uint32_t B, uint32_t C, uint32_t D)
 {
 	return B & C | B & D | C & D;
 }
-
-
 
