@@ -1,5 +1,6 @@
 #include "sha1.h"
 
+
 static uint32_t shiftLeft(uint32_t, const int);
 static void generateWords(uint8_t [], uint32_t []);
 static uint32_t f1(uint32_t, uint32_t, uint32_t);
@@ -14,7 +15,7 @@ static const uint32_t K4 = 0xca62c1d6;
 void sha1Init(sha1Context *context) 
 {
 	context->intermediateHash[0] = 0x67452301;
-	context->intermediateHash[1] = 0xefcdaB89;
+	context->intermediateHash[1] = 0xefcdab89;
 	context->intermediateHash[2] = 0x98badcfe;
 	context->intermediateHash[3] = 0x10325476;
 	context->intermediateHash[4] = 0xc3d2e1f0;
@@ -101,13 +102,13 @@ void sha1ProcessBlock(sha1Context *context)
 
 void sha1PadMessage(sha1Context *context)
 {
-	int i;
+	int i, j;
 	
 	context->messageBlock[context->index++] = 0x80;
 
 	if (context->index > 56) {
 		for (i = context->index; i < 64; i++)
-			context->message[context->index++]
+			context->messageBlock[context->index++] = 0;
 		
 		sha1ProcessBlock(context);
 	}
@@ -115,14 +116,21 @@ void sha1PadMessage(sha1Context *context)
 	for (i = context->index; i < 56; i++)
 		context->messageBlock[context->index++] = 0;
 
-	// message length to bytes functionality
+	for (j = 7; j >= 0; j--)
+		context->messageBlock[context->index++] = context->messageLength >> j * 8;
 
 	sha1ProcessBlock(context);	
 }
 
+void sha1Output(sha1Context *context)
+{
+
+
+}
+
 static uint32_t shiftLeft(uint32_t val, const int x)
 {
-	return val << x | val >> 32 - x;
+	return val << x | val >> (32 - x);
 }
 
 static void generateWords(uint8_t inputBytes[], uint32_t messageWords[])
@@ -133,7 +141,7 @@ static void generateWords(uint8_t inputBytes[], uint32_t messageWords[])
 		messageWords[i] = 0;
 
 	for (i = 0; i < 64; i++) {
-		shiftValue = (uint32_t) inputBytes[i] << 24 - (i % 4) * 8; 
+		shiftValue = (uint32_t) inputBytes[i] << (24 - (i % 4) * 8); 
 		messageWords[i/4] |= shiftValue;
 	}
 	
