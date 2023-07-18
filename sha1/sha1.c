@@ -1,5 +1,5 @@
 #include "sha1.h"
-
+#include <stdlib.h>
 
 static uint32_t shiftLeft(uint32_t, const int);
 static void generateWords(uint8_t [], uint32_t []);
@@ -122,10 +122,11 @@ void sha1PadMessage(sha1Context *context)
 	sha1ProcessBlock(context);	
 }
 
-void sha1Output(sha1Context *context)
+void sha1Output(uint8_t messageDigest[], sha1Context *context)
 {
-
-
+	int i;
+	for (i = 0; i < 20; i++) 
+		messageDigest[i] = context->intermediateHash[i/4] >> (3 - i % 4) * 8; 	
 }
 
 static uint32_t shiftLeft(uint32_t val, const int x)
