@@ -14,6 +14,4 @@ void sha1Init(sha1Context *);
 void sha1ProcessBlock(sha1Context *);
 void sha1PadMessage(sha1Context *);
 void sha1Input(uint8_t *, uint64_t messageLength, sha1Context *);
-void sha1Output(uint8_t [], sha1Context *);
-char *hexDigest(sha1Context *);
-
+void sha1Output(uint8_t *, sha1Context *);
