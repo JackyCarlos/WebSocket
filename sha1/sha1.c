@@ -122,10 +122,10 @@ void sha1PadMessage(sha1Context *context)
 	sha1ProcessBlock(context);	
 }
 
-void sha1Output(uint8_t messageDigest[], sha1Context *context)
+void sha1Output(uint8_t *messageDigest, sha1Context *context)
 {
 	int i;
-	for (i = 0; i < 20; i++) 
+	for (i = 0; i < HASHSIZE; i++) 
 		messageDigest[i] = context->intermediateHash[i/4] >> (3 - i % 4) * 8; 	
 }
 
