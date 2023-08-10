@@ -64,28 +64,3 @@ char *hexdigest(sha1Context *context)
 
 	return hexdigest;
 }
-
-/*
-	sha1Context context;
-	sha1Init(&context);
-
-	char *test = "   ";
-	unsigned char messageDigest[20];	
-
-	sha1Input((uint8_t *) test, 3, &context);
-	
-	//printf("%s\n", hexdigest(&context));
-
-	sha1Output(messageDigest, &context);
-	char hexdigest[41];
-	char temp[3];
-
-	for (int i = 0; i < HASHSIZE; i++) {
-		sprintf(temp, "%02x", messageDigest[i]);
-		strcat(hexdigest, temp);
-	}
-
-	printf("%s\n", hexdigest);
-
-	return 0;
-*/
