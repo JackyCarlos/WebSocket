@@ -33,4 +33,5 @@ typedef struct {
 
 wsServer *createWsServer(void);
 int get_listener_socket(void);
-wsConnection *acceptWsConnection(wsServer *server);
+wsConnection *acceptWsConnection(wsServer *);
+void setupConnections(wsServer *);
