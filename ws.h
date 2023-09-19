@@ -10,21 +10,27 @@
 #include <netdb.h>
 #include <poll.h>
 
+enum wsstatus {
+	INITIALIZING = 1,
+	ESTABLISHED = 2
+};
+
 typedef struct {
 	unsigned int fd;
 	unsigned int status;
-	char data[256];
+	struct sockaddr_storage remoteaddr;
 } wsConnection;
 
 typedef struct {
 	unsigned id;
 	unsigned listeningSfd;
 	
-	unsigned int connMax = 10;
-	unsigned int connCount = 0;
+	unsigned int connMax;
+	unsigned int connCount;
 
-	struct wsConnection *connections;
+	wsConnection *connections;
 } wsServer;
 
 wsServer *createWsServer(void);
-unsigned int get_listener_socket(void);
+int get_listener_socket(void);
+wsConnection *acceptWsConnection(wsServer *server);
