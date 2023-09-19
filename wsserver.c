@@ -16,6 +16,8 @@
 
 unsigned serverID = 0;
 
+
+
 wsConnection
 *acceptWsConnection(wsServer *server)
 {
@@ -52,9 +54,17 @@ wsServer
 		return NULL;
 
 	server->id = serverID++;
+	setupConnections(server);
 
 	return server;
 }
+
+void 
+setupConnections(wsServer *server)
+{
+
+}
+
 
 // returns -1 on failure, on success return created socket fd
 int 
