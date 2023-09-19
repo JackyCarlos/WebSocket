@@ -12,26 +12,52 @@
  *
  * */
 
+#include "ws.h"
+
 unsigned serverID = 0;
+
+wsConnection
+*acceptWsConnection(wsServer *server)
+{
+	int newfd;
+	socklen_t addrlen = sizeof(struct sockaddr_storage);
+	wsConnection *con;
+
+	for(int i = 0; i < server->connMax; i++) 
+		if (server->connections[i].status == INITIALIZING) {
+			con = &server->connections[i];
+			break;
+		}
+
+	newfd = accept(server->listeningSfd, (struct sockaddr *) &con->remoteaddr, &addrlen);
+	if (newfd == -1)
+		return NULL;
+	
+	con->fd = newfd;
+
+	return con;
+}
 
 wsServer 
 *createWsServer(void) 
 {
 	int listener;
 
-	wsServer *server = (wsServer *) malloc(sizeof wsServer);
-	server->connections = (wsConnection *) malloc(sizeof wsConnection * server->connMax);
+	wsServer *server = (wsServer *) malloc(sizeof (wsServer));
+	server->connections = (wsConnection *) malloc(sizeof (wsConnection) * server->connMax);
 
 	server->listeningSfd = get_listener_socket();
 
 	if (server->listeningSfd < 0)
 		return NULL;
 
+	server->id = serverID++;
+
 	return server;
 }
 
 // returns -1 on failure, on success return created socket fd
-unsigned int 
+int 
 get_listener_socket(void)
 {
 	int listener, yes, rv;
@@ -43,7 +69,7 @@ get_listener_socket(void)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 
-	if ((rv = getaddrinfo(NULL, 9999, &hints, &ai)) != 0)
+	if ((rv = getaddrinfo(NULL, "9999", &hints, &ai)) != 0)
 		return -1;
 
 	for (p = ai; p != NULL; p = p->ai_next) {
