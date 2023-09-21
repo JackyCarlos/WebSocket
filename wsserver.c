@@ -1,68 +1,61 @@
 /*
- *	wsserver.c -- simple web socket server dealing with multiple ws connections simultaneously
+ *	wsserver.c -- a simple web socket server 
  */
-
-
-/*
- * geplantes Interface: 
- * createWsServer(); 			starte einen neuen Server mit eine listening socket 			Return value: fd listening socket
- * acceptWsConnection(); 		akzeptiere neue Connections auf dem server						Return value: fd connection
- * sendData();					sende Daten auf einer bestimmten Connection						Return value: success wenn Senden von Daten erfolgreich war
- * recvData();					empfange Daten auf einer bestimmten Connection 					Return value: success wenn Lesen von Daten erfolgreich war
- *
- * */
 
 #include "ws.h"
 
-unsigned serverID = 0;
-
-
+static wsConnection connections[MAX_CON];
+static int listening_fd;
+static int con_count = 0;
 
 wsConnection
-*acceptWsConnection(wsServer *server)
+*accept_ws_connection()
 {
 	int newfd;
 	socklen_t addrlen = sizeof(struct sockaddr_storage);
 	wsConnection *con;
 
-	for(int i = 0; i < server->connMax; i++) 
-		if (server->connections[i].status == INITIALIZING) {
-			con = &server->connections[i];
+	for(int i = 0; i < MAX_CON; i++) 
+		if (connections[i].status == INITIALIZING) {
+			con = &connections[i];
 			break;
 		}
 
-	newfd = accept(server->listeningSfd, (struct sockaddr *) &con->remoteaddr, &addrlen);
+	newfd = accept(listening_fd, (struct sockaddr *) &con->remoteaddr, &addrlen);
 	if (newfd == -1)
 		return NULL;
 	
 	con->fd = newfd;
 
+	ws_handshake(con);
+
 	return con;
 }
 
-wsServer 
-*createWsServer(void) 
+void
+ws_handshake(wsConnection *con)
 {
-	int listener;
-
-	wsServer *server = (wsServer *) malloc(sizeof (wsServer));
-	server->connections = (wsConnection *) malloc(sizeof (wsConnection) * server->connMax);
-
-	server->listeningSfd = get_listener_socket();
-
-	if (server->listeningSfd < 0)
-		return NULL;
-
-	server->id = serverID++;
-	setupConnections(server);
-
-	return server;
+	
 }
 
-void 
-setupConnections(wsServer *server)
+int
+ws_server() 
 {
+	listening_fd = get_listener_socket();
+	if (listening_fd < 0)
+		return -1;
 
+	setup_connections();
+
+	return 0;
+}
+
+static void 
+setup_connections()
+{
+	for (int i = 0; i < MAX_CON; i++) {
+		connections[i].status = INITIALIZING;
+	}
 }
 
 
@@ -102,15 +95,4 @@ get_listener_socket(void)
 		return -1;
 	return listener;
 }
-
-
-
-
-
-
-
-
-
-
-
 
