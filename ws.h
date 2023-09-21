@@ -10,6 +10,8 @@
 #include <netdb.h>
 #include <poll.h>
 
+#define 	MAX_CON 	10
+
 enum wsstatus {
 	INITIALIZING = 1,
 	ESTABLISHED = 2
@@ -21,17 +23,11 @@ typedef struct {
 	struct sockaddr_storage remoteaddr;
 } wsConnection;
 
-typedef struct {
-	unsigned id;
-	unsigned listeningSfd;
-	
-	unsigned int connMax;
-	unsigned int connCount;
-
-	wsConnection *connections;
-} wsServer;
-
-wsServer *createWsServer(void);
+int ws_server(void);
 int get_listener_socket(void);
-wsConnection *acceptWsConnection(wsServer *);
-void setupConnections(wsServer *);
+wsConnection *accept_ws_connection(void);
+static void setup_connections(void);
+
+void ws_handshake(wsConnection *);
+int send_ws_frame(wsConnection, char *buf, int len);
+int receive_ws_frame(wsConnection *, char *buf, int len);
