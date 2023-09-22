@@ -32,10 +32,28 @@ wsConnection
 	return con;
 }
 
-void
+int
 ws_handshake(wsConnection *con)
 {
-	char 
+	char method[20], data[2048];
+	HTTP_header request_headers[20];
+	int hcount, i;
+
+	recv(con->fd, data, 2048, 0);
+	parse_http_request(data, method, http_headers, &hcount);
+
+	if (strcmp(method, "GET"))
+		return -1; 
+
+	for (i = 0; i < hcount; i++) {
+		
+	}
+
+
+
+
+
+	con->status = OPEN;
 }
 
 int
