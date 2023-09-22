@@ -1,7 +1,7 @@
 #include "ws.h"
 
 void 
-parse_http_request(char *request, char *method, HTTP_header *request_headers) 
+parse_http_request(char *request, char *method, HTTP_header *request_headers, int *count) 
 {
 	char *request_line, *raw_header, *header;
 	int pos;
@@ -21,6 +21,7 @@ parse_http_request(char *request, char *method, HTTP_header *request_headers)
 			raw_headers[pos++] = raw_header;
 		raw_header = strtok(NULL, "\r\n");
 	}
+	*count = pos;
 
 	// extract http method
 	// strcpy(method, strtok(request_line, " "));
