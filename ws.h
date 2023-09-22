@@ -13,8 +13,10 @@
 #define 	MAX_CON 	10
 
 enum wsstatus {
-	INITIALIZING = 1,
-	ESTABLISHED = 2
+	CONNECTING = 1,
+	OPEN = 2,
+	CLOSING = 4,
+	CLOSED = 8
 };
 
 typedef struct {
@@ -22,6 +24,11 @@ typedef struct {
 	unsigned int status;
 	struct sockaddr_storage remoteaddr;
 } wsConnection;
+
+typedef struct {
+	char header[40];
+	char value[100];
+} HTTP_header;
 
 int ws_server(void);
 int get_listener_socket(void);
