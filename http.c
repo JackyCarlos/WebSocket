@@ -24,7 +24,6 @@ parse_http_request(char *request, char *method, HTTP_header *request_headers, in
 	*count = pos;
 
 	// extract http method
-	// strcpy(method, strtok(request_line, " "));
 	strcpy(method, strtok(request_line, " "));
 
 	for (int i = 0; i < pos; i++) {
