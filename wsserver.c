@@ -15,8 +15,8 @@ wsConnection
 	socklen_t addrlen = sizeof(struct sockaddr_storage);
 	wsConnection *con;
 
-	for(int i = 0; i < MAX_CON; i++) 
-		if (connections[i].status == INITIALIZING) {
+	for (int i = 0; i < MAX_CON; i++) 
+		if (connections[i].status == CONNECTING) {
 			con = &connections[i];
 			break;
 		}
@@ -35,7 +35,7 @@ wsConnection
 void
 ws_handshake(wsConnection *con)
 {
-	
+	char 
 }
 
 int
@@ -54,7 +54,7 @@ static void
 setup_connections()
 {
 	for (int i = 0; i < MAX_CON; i++) {
-		connections[i].status = INITIALIZING;
+		connections[i].status = CONNECTING;
 	}
 }
 
