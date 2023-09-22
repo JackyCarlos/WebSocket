@@ -26,8 +26,8 @@ typedef struct {
 } wsConnection;
 
 typedef struct {
-	char header[40];
-	char value[100];
+	char *header;
+	char *value;
 } HTTP_header;
 
 int ws_server(void);
@@ -35,6 +35,9 @@ int get_listener_socket(void);
 wsConnection *accept_ws_connection(void);
 static void setup_connections(void);
 
-void ws_handshake(wsConnection *);
-int send_ws_frame(wsConnection, char *buf, int len);
+int ws_handshake(wsConnection *);
+int send_ws_frame(wsConnection *, char *buf, int len);
 int receive_ws_frame(wsConnection *, char *buf, int len);
+
+// http stuff
+void parse_http_request(char *data, char *method, HTTP_header *, int *count);
