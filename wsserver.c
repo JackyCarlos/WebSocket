@@ -37,23 +37,37 @@ ws_handshake(wsConnection *con)
 {
 	char method[20], data[2048];
 	HTTP_header request_headers[20];
-	int hcount, i;
+	int hcount, i, status;
 
 	recv(con->fd, data, 2048, 0);
-	parse_http_request(data, method, http_headers, &hcount);
+	parse_http_request(data, method, request_headers, &hcount);
 
 	if (strcmp(method, "GET"))
 		return -1; 
 
-	for (i = 0; i < hcount; i++) {
-		
-	}
+	for (i = 0; i < hcount; i++)
+		if (!strcmp(request_headers[i].header, "Host")
+			status |= HOST;
+		else if (!strcmp(request_headers[i].header, "Upgrade") && !strcmp(request_headers[i].value, "websocket"))
+			status |= UPGRADE;
+		else if (!strcmp(request_headers[i].header, "Connection") && !strcmp(request_headers[i].value, "Upgrade"))
+			status |= CONNECTION;
+		else if (!strcmp(request_headers[i].header, "Sec-WebSocket-Key"))
+			status |= WSKEY;
+		else if (!strcmp(request_headers[i].header, "Sec-WebSocket-Version") && !strcmp(request_header[i].value, "13"))
+			status |= WSVERSION
+		else if (!strcmp(request_headers[i].header, "Origin"))
+			status |= ORIGIN
+		else if (!strcmp(request_headers[i].header, "Sec-WebSocket-Protocol"))
+			;
+		else if (!strcmp(request_headers[i].header, "Sec-WebSocket-Extension"))
+			;	
 
-
-
-
-
+	if (status < 248)
+		return -2;
+	
 	con->status = OPEN;
+	return 0;
 }
 
 int
