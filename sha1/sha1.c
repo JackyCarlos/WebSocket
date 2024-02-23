@@ -12,7 +12,8 @@ static const uint32_t K2 = 0x6ed9eba1;
 static const uint32_t K3 = 0x8f1bbcdc;
 static const uint32_t K4 = 0xca62c1d6;
 
-void sha1_init(sha1_context_t *context) 
+void 
+sha1_init(sha1_context_t *context) 
 {
 	context->intermediate_hash[0] = 0x67452301;
 	context->intermediate_hash[1] = 0xefcdab89;
@@ -23,7 +24,8 @@ void sha1_init(sha1_context_t *context)
 	context->index = 0;
 }
 
-void sha1_input(uint8_t *message, uint64_t message_length, sha1_context_t *context) 
+void 
+sha1_input(uint8_t *message, uint64_t message_length, sha1_context_t *context) 
 {
 	int i;
 	context->message_length = message_length * 8;
@@ -40,7 +42,8 @@ void sha1_input(uint8_t *message, uint64_t message_length, sha1_context_t *conte
 	sha1_pad_message(context);
 } 
 
-void sha1_process_block(sha1_context_t *context)
+void 
+sha1_process_block(sha1_context_t *context)
 {
 	int i;
 	uint32_t message_words[80];
@@ -99,7 +102,8 @@ void sha1_process_block(sha1_context_t *context)
 	context->index = 0;		
 }
 
-void sha1_pad_message(sha1_context_t *context)
+void 
+sha1_pad_message(sha1_context_t *context)
 {
 	int i, j;
 	
@@ -121,19 +125,22 @@ void sha1_pad_message(sha1_context_t *context)
 	sha1_process_block(context);	
 }
 
-void sha1_output(uint8_t *message_digest, sha1_context_t *context)
+void 
+sha1_output(uint8_t *message_digest, sha1_context_t *context)
 {
 	int i;
 	for (i = 0; i < HASHSIZE; i++) 
 		message_digest[i] = context->intermediate_hash[i/4] >> (3 - i % 4) * 8; 	
 }
 
-static uint32_t shift_left(uint32_t val, const int x)
+static uint32_t 
+shift_left(uint32_t val, const int x)
 {
 	return val << x | val >> (32 - x);
 }
 
-static void generate_words(uint8_t input_bytes[], uint32_t message_words[])
+static void 
+generate_words(uint8_t input_bytes[], uint32_t message_words[])
 {
 	int i, shift_value;
 	
@@ -149,17 +156,20 @@ static void generate_words(uint8_t input_bytes[], uint32_t message_words[])
 		message_words[i] = shift_left(message_words[i - 16] ^ message_words[i - 14] ^ message_words[i - 8] ^ message_words[i - 3], 1);
 }
 
-static uint32_t f1(uint32_t B, uint32_t C, uint32_t D) 
+static uint32_t 
+f1(uint32_t B, uint32_t C, uint32_t D) 
 {
 	return B & C | ~B & D;
 }
 
-static uint32_t f2 (uint32_t B, uint32_t C, uint32_t D) 
+static uint32_t 
+f2 (uint32_t B, uint32_t C, uint32_t D) 
 {
 	return B ^ C ^ D;
 }
 
-static uint32_t f3(uint32_t B, uint32_t C, uint32_t D) 
+static uint32_t 
+f3(uint32_t B, uint32_t C, uint32_t D) 
 {
 	return B & C | B & D | C & D;
 }
