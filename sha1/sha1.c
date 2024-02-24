@@ -33,10 +33,11 @@ sha1_input(uint8_t *message, uint64_t message_length, sha1_context_t *context)
 	for (i = 0; i < message_length; i++) {
 		context->message_block[context->index] = *message++;
 		
-		if (context->index == 63)
+		if (context->index == 63) {
 			sha1_process_block(context);
-		else 
+		} else { 
 			context->index++;
+		}
 	}
 
 	sha1_pad_message(context);
@@ -110,17 +111,20 @@ sha1_pad_message(sha1_context_t *context)
 	context->message_block[context->index++] = 0x80;
 
 	if (context->index > 56) {
-		for (i = context->index; i < 64; i++)
+		for (i = context->index; i < 64; i++) {
 			context->message_block[context->index++] = 0;
+		}
 		
 		sha1_process_block(context);
 	}
 
-	for (i = context->index; i < 56; i++)
+	for (i = context->index; i < 56; i++) {
 		context->message_block[context->index++] = 0;
+	}
 
-	for (j = 7; j >= 0; j--)
+	for (j = 7; j >= 0; j--) {
 		context->message_block[context->index++] = context->message_length >> j * 8;
+	}
 
 	sha1_process_block(context);	
 }
@@ -129,8 +133,9 @@ void
 sha1_output(uint8_t *message_digest, sha1_context_t *context)
 {
 	int i;
-	for (i = 0; i < HASHSIZE; i++) 
+	for (i = 0; i < HASHSIZE; i++) {
 		message_digest[i] = context->intermediate_hash[i/4] >> (3 - i % 4) * 8; 	
+	}
 }
 
 static uint32_t 
@@ -144,16 +149,18 @@ generate_words(uint8_t input_bytes[], uint32_t message_words[])
 {
 	int i, shift_value;
 	
-	for (i = 0; i < 16; i++) 
+	for (i = 0; i < 16; i++) {
 		message_words[i] = 0;
+	}
 
 	for (i = 0; i < 64; i++) {
 		shift_value = (uint32_t) input_bytes[i] << (24 - (i % 4) * 8); 
 		message_words[i/4] |= shift_value;
 	}
 	
-	for (i = 16; i < 80; i++)
+	for (i = 16; i < 80; i++) {
 		message_words[i] = shift_left(message_words[i - 16] ^ message_words[i - 14] ^ message_words[i - 8] ^ message_words[i - 3], 1);
+	}
 }
 
 static uint32_t 
@@ -174,3 +181,20 @@ f3(uint32_t B, uint32_t C, uint32_t D)
 	return B & C | B & D | C & D;
 }
 
+/*
+
+Curry Pulver
+Kurkuma Pulver
+Kräuter der Provence
+Smoked Paprika
+
+
+Cayenne Pfeffer Pulver
+Kreuzkümmel Cumin
+Paprika scharf
+Paprika Edelsüß
+
+
+
+
+*/
