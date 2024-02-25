@@ -17,7 +17,7 @@ ws_server()
 		return -1;
 	}
 
-	connections = (ws_connection_t **) malloc(sizeof(ws_connection_t *) * max_con);
+	connections = malloc(sizeof(ws_connection_t *) * max_con);
 
 	return 0;
 }
@@ -41,6 +41,13 @@ ws_connection_t
 	connection->status = CONNECTING;
 
 	ws_handshake(connection);
+
+	connections[con_count++] = connection;
+
+	if(con_count == max_con) {
+		max_con += 10;
+		connections = realloc(connections, sizeof(ws_connection_t *) * max_con);
+	}
 
 	return con;
 }
