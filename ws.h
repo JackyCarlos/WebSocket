@@ -32,13 +32,12 @@ typedef struct {
 } http_header_t;
 
 int ws_server(void);
-static int get_listener_socket(void);
-static ws_connection_t *accept_ws_connection(void);
-static void setup_connections(void);
+
+ws_connection_t *accept_ws_connection(void);
 
 int ws_handshake(ws_connection_t *);
 int send_ws_frame(ws_connection_t *, char *buf, int len);
 int receive_ws_frame(ws_connection_t *, char *buf, int len);
 
 // http stuff
-void parse_http_request(char *data, char *method, HTTP_header *, int *count);
+void parse_http_request(char *data, char *method, http_header_t **, int *count);
