@@ -1,7 +1,7 @@
 #include "ws.h"
 
 void 
-parse_http_request(char *request, char *method, http_header_t **request_headers, int *count) 
+parse_http_request(char *request, char *method, char *http_version, http_header_t **request_headers, int *count) 
 {	
 	char *request_line, *raw_header, *header;
 	int header_count, max_header;
@@ -31,6 +31,8 @@ parse_http_request(char *request, char *method, http_header_t **request_headers,
 
 	// extract http method
 	strcpy(method, strtok(request_line, " "));
+	strtok(NULL, " ");
+	strcpy(http_version, strtok(NULL, " "));
 
 	*request_headers = malloc(header_count * sizeof(http_header_t));
 
@@ -41,4 +43,10 @@ parse_http_request(char *request, char *method, http_header_t **request_headers,
 	}
 
 	free(raw_headers);
+}
+
+void build_http_reponse(int status_code, http_header_t *reponse_headers) {
+	
+	
+	return;
 }
