@@ -1,13 +1,23 @@
 /*
  *	wsserver.c -- a simple web socket server 
  */
-#include <stdlib.h>
 
 #include "ws.h"
+
+static int get_listener_socket(void);
 
 static ws_connection_t **connections;
 static int listening_fd;
 static int con_count = 0, max_con = 10;
+
+enum handshake_headers {
+	HOST = 128, 
+	UPGRADE = 64,
+	CONNECTION = 32,
+	WSKEY = 16,
+	WSVERSION = 8,
+	ORIGIN = 4
+};
 
 int
 ws_server() 
@@ -31,7 +41,7 @@ ws_connection_t
 
 	addrlen = sizeof(struct sockaddr_storage);
 
-	newfd = accept(listening_fd, (struct sockaddr *) &con->remoteaddr, &addrlen);
+	newfd = accept(listening_fd, (struct sockaddr *) &connection->remoteaddr, &addrlen);
 	if (newfd == -1) {
 		return NULL;
 	}
@@ -49,23 +59,23 @@ ws_connection_t
 		connections = realloc(connections, sizeof(ws_connection_t *) * max_con);
 	}
 
-	return con;
+	return connection;
 }
 
 int
-ws_handshake(wsConnection *con)
+ws_handshake(ws_connection_t *con)
 {
 	char method[20], data[2048];
-	HTTP_header request_headers[20];
-	int hcount, i, status;
-q
+	http_header_t *request_headers;
+	int hcount, status;
+
 	recv(con->fd, data, 2048, 0);
 	parse_http_request(data, method, request_headers, &hcount);
 
 	if (strcmp(method, "GET"))
 		return -1; 
 
-	for (i = 0; i < hcount; ++i)
+	for (int i = 0; i < hcount; ++i)
 		if (!strcmp(request_headers[i].header, "Host"))
 			status |= HOST;
 		else if (!strcmp(request_headers[i].header, "Upgrade") && !strcmp(request_headers[i].value, "websocket"))
@@ -74,10 +84,10 @@ q
 			status |= CONNECTION;
 		else if (!strcmp(request_headers[i].header, "Sec-WebSocket-Key"))
 			status |= WSKEY;
-		else if (!strcmp(request_headers[i].header, "Sec-WebSocket-Version") && !strcmp(request_header[i].value, "13"))
-			status |= WSVERSION
+		else if (!strcmp(request_headers[i].header, "Sec-WebSocket-Version") && !strcmp(request_headers[i].value, "13"))
+			status |= WSVERSION;
 		else if (!strcmp(request_headers[i].header, "Origin"))
-			status |= ORIGIN
+			status |= ORIGIN;
 		else if (!strcmp(request_headers[i].header, "Sec-WebSocket-Protocol"))
 			;
 		else if (!strcmp(request_headers[i].header, "Sec-WebSocket-Extension"))
