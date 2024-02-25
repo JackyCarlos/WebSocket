@@ -9,7 +9,8 @@ static const uint8_t input_alphabet[] = { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'
                                        '8', '9', '+', '/' };
 static uint8_t *output_alphabet = NULL;
 
-char *base64_encode(const char *input_data, uint32_t input_data_length) {
+char * 
+base64_encode(const char *input_data, uint32_t input_data_length) {
     uint32_t output_length, triple;
     int j, padding;
     char *output_data;
@@ -44,7 +45,8 @@ char *base64_encode(const char *input_data, uint32_t input_data_length) {
     return output_data;
 }
 
-char *base64_decode(const char *input_data, uint32_t input_data_length) {
+char *
+base64_decode(const char *input_data, uint32_t input_data_length) {
     char *output_data;
     uint32_t output_length, quadruple;
     int j; 
@@ -84,7 +86,8 @@ char *base64_decode(const char *input_data, uint32_t input_data_length) {
     return output_data;
 }
 
-static void create_output_alphabet(void) {
+static void 
+create_output_alphabet(void) {
     output_alphabet = (char *) malloc(256);
     if (output_alphabet == NULL) {
         return;
