@@ -12,6 +12,7 @@
 #include <stdint.h>
 
 #define 	MAX_CON 	10
+#define 	GUID		"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 enum ws_status {
 	CONNECTING 	= 1,
@@ -40,4 +41,5 @@ int send_ws_frame(ws_connection_t *, char *buf, int len);
 int receive_ws_frame(ws_connection_t *, char *buf, int len);
 
 // http stuff
-void parse_http_request(char *data, char *method, http_header_t **, int *count);
+void parse_http_request(char *data, char *method, char *http_version, http_header_t **, int *count);
+void build_http_reponse(int status_code, http_header_t *reponse_headers);
