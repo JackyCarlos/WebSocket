@@ -1,33 +1,46 @@
 /*
  *	wsserver.c -- a simple web socket server 
  */
+#include <stdlib.h>
 
 #include "ws.h"
 
-static wsConnection connections[MAX_CON];
+static ws_connection_t **connections;
 static int listening_fd;
-static int con_count = 0;
+static int con_count = 0, max_con = 10;
 
-wsConnection
+int
+ws_server() 
+{
+	listening_fd = get_listener_socket();
+	if (listening_fd < 0) {
+		return -1;
+	}
+
+	connections = (ws_connection_t **) malloc(sizeof(ws_connection_t *) * max_con);
+
+	return 0;
+}
+
+ws_connection_t
 *accept_ws_connection()
 {
 	int newfd;
-	socklen_t addrlen = sizeof(struct sockaddr_storage);
-	wsConnection *con;
+	socklen_t addrlen; 
+	ws_connection_t *connection;
 
-	for (int i = 0; i < MAX_CON; i++) 
-		if (connections[i].status == CONNECTING) {
-			con = &connections[i];
-			break;
-		}
+	addrlen = sizeof(struct sockaddr_storage);
 
 	newfd = accept(listening_fd, (struct sockaddr *) &con->remoteaddr, &addrlen);
-	if (newfd == -1)
+	if (newfd == -1) {
 		return NULL;
-	
-	con->fd = newfd;
+	}
 
-	ws_handshake(con);
+	connection = (ws_connection_t *) malloc(sizeof(ws_connection_t));
+	connection->fd = newfd;
+	connection->status = CONNECTING;
+
+	ws_handshake(connection);
 
 	return con;
 }
@@ -38,15 +51,15 @@ ws_handshake(wsConnection *con)
 	char method[20], data[2048];
 	HTTP_header request_headers[20];
 	int hcount, i, status;
-
+q
 	recv(con->fd, data, 2048, 0);
 	parse_http_request(data, method, request_headers, &hcount);
 
 	if (strcmp(method, "GET"))
 		return -1; 
 
-	for (i = 0; i < hcount; i++)
-		if (!strcmp(request_headers[i].header, "Host")
+	for (i = 0; i < hcount; ++i)
+		if (!strcmp(request_headers[i].header, "Host"))
 			status |= HOST;
 		else if (!strcmp(request_headers[i].header, "Upgrade") && !strcmp(request_headers[i].value, "websocket"))
 			status |= UPGRADE;
@@ -70,27 +83,6 @@ ws_handshake(wsConnection *con)
 	return 0;
 }
 
-int
-ws_server() 
-{
-	listening_fd = get_listener_socket();
-	if (listening_fd < 0)
-		return -1;
-
-	setup_connections();
-
-	return 0;
-}
-
-static void 
-setup_connections()
-{
-	for (int i = 0; i < MAX_CON; i++) {
-		connections[i].status = CONNECTING;
-	}
-}
-
-
 // returns -1 on failure, on success return created socket fd
 int 
 get_listener_socket(void)
@@ -104,13 +96,17 @@ get_listener_socket(void)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 
-	if ((rv = getaddrinfo(NULL, "9999", &hints, &ai)) != 0)
+	rv = getaddrinfo(NULL, "9999", &hints, &ai);
+
+	if (rv != 0) {
 		return -1;
+	}
 
 	for (p = ai; p != NULL; p = p->ai_next) {
 		listener = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-		if (listener < 0)
+		if (listener < 0) {
 			continue;
+		}
 
 		setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
 
@@ -123,8 +119,9 @@ get_listener_socket(void)
 	}
 
 	freeaddrinfo(ai);
-	if (p == NULL || listen(listener, 10) == -1)
+	if (p == NULL || listen(listener, 10) == -1) {
 		return -1;
+	}
 	return listener;
 }
 
