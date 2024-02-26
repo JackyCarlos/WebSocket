@@ -1,9 +1,9 @@
 #include "ws.h"
 
-void 
+int 
 parse_http_request(char *request, char *method, char *http_version, http_header_t **request_headers, int *count) 
 {	
-	char *request_line, *raw_header, *header;
+	char *request_line, *header_end, *raw_header, *header;
 	int header_count, max_header;
 	char **raw_headers;
 
@@ -12,10 +12,18 @@ parse_http_request(char *request, char *method, char *http_version, http_header_
 	raw_headers = malloc(max_header * sizeof(char *));
 	
 	// get rid of the http payload
-	char *header_end = strstr(request, "\r\n\r\n");
+	header_end = strstr(request, "\r\n\r\n");
+	if (header_end == NULL) {
+		return -1;
+	}
+
 	*header_end = '\0';
 
 	request_line = strtok(request, "\r\n");
+	if (request_line == NULL) {
+		return -1;
+	}
+
 	raw_header = strtok(NULL, "\r\n");
 
 	while (raw_header != NULL) {
@@ -43,6 +51,7 @@ parse_http_request(char *request, char *method, char *http_version, http_header_
 	}
 
 	free(raw_headers);
+	return 0;
 }
 
 void build_http_reponse(int status_code, http_header_t *reponse_headers) {
