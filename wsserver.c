@@ -34,21 +34,24 @@ ws_server()
 
 ws_connection_t
 *accept_ws_connection()
-{
+{	
 	int newfd;
-	socklen_t addrlen; 
+	socklen_t addrlen;
+	struct sockaddr_storage remote_addr;
 	ws_connection_t *connection;
 
 	addrlen = sizeof(struct sockaddr_storage);
 
-	newfd = accept(listening_fd, (struct sockaddr *) &connection->remoteaddr, &addrlen);
+	newfd = accept(listening_fd, (struct sockaddr *) &remote_addr, &addrlen);
 	if (newfd == -1) {
+		fprintf(stderr, "accept error: %s\n", strerror(errno));
 		return NULL;
 	}
 
 	connection = (ws_connection_t *) malloc(sizeof(ws_connection_t));
 	connection->fd = newfd;
 	connection->status = CONNECTING;
+	connection->remote_addr = remote_addr;
 
 	ws_handshake(connection);
 
@@ -69,7 +72,11 @@ ws_handshake(ws_connection_t *con)
 	http_header_t *request_headers;
 	int hcount, status;
 
-	recv(con->fd, data, 2048, 0);
+	if(recv(con->fd, data, 2048, 0) == -1) {
+		perror("recv");
+		return -1;
+	}
+
 	parse_http_request(data, method, http_version, &request_headers, &hcount);
 
 	if (strcmp(method, "GET") || !strcmp(http_version, "HTTP/1.0")) {
@@ -120,18 +127,25 @@ get_listener_socket(void)
 	rv = getaddrinfo(NULL, "9999", &hints, &ai);
 
 	if (rv != 0) {
+		fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(errno));
 		return -1;
 	}
 
 	for (p = ai; p != NULL; p = p->ai_next) {
 		listener = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
 		if (listener < 0) {
+			perror("socket error");
 			continue;
 		}
 
-		setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+		if(setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+			perror("setsockopt error");
+			close(listener);
+			return -1;
+		}
 
 		if (bind(listener, p->ai_addr, p->ai_addrlen) < 0) {
+			perror("bind error");
 			close(listener);
 			continue;
 		}
@@ -140,9 +154,13 @@ get_listener_socket(void)
 	}
 
 	freeaddrinfo(ai);
-	if (p == NULL || listen(listener, 10) == -1) {
+	if (p == NULL) {
 		return -1;
 	}
+
+	if (listen(listener, 10) == -1) {
+		fprintf(stderr, "listen error: %s\n", strerror(errno));
+	}
+
 	return listener;
 }
-
