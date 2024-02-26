@@ -44,7 +44,7 @@ ws_connection_t
 
 	newfd = accept(listening_fd, (struct sockaddr *) &remote_addr, &addrlen);
 	if (newfd == -1) {
-		fprintf(stderr, "accept error: %s\n", strerror(errno));
+		perror("accept error:");
 		return NULL;
 	}
 
@@ -52,8 +52,6 @@ ws_connection_t
 	connection->fd = newfd;
 	connection->status = CONNECTING;
 	connection->remote_addr = remote_addr;
-
-	ws_handshake(connection);
 
 	connections[con_count++] = connection;
 
@@ -70,19 +68,25 @@ ws_handshake(ws_connection_t *con)
 {
 	char method[20], http_version[20], data[2048];
 	http_header_t *request_headers;
-	int hcount, status;
+	int hcount, status, ec;
+	
+	status = 0;
 
 	if(recv(con->fd, data, 2048, 0) == -1) {
 		perror("recv");
 		return -1;
 	}
 
-	parse_http_request(data, method, http_version, &request_headers, &hcount);
+	ec = parse_http_request(data, method, http_version, &request_headers, &hcount);
+	if (ec == -1) {
+		// fprintf(stderr, "malformed http request");
+		return -2;
+	}
 
 	if (strcmp(method, "GET") || !strcmp(http_version, "HTTP/1.0")) {
-		return -1; 
+		return -3; 
 	}
-	
+
 	for (int i = 0; i < hcount; ++i) {
 		if (!strcmp(request_headers[i].header, "Host"))
 			status |= HOST;
@@ -103,7 +107,7 @@ ws_handshake(ws_connection_t *con)
 	}	
 
 	if (status < 248) {
-		return -2;
+		return -4;
 	}
 	
 	con->status = OPEN;
