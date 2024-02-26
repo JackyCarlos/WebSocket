@@ -24,7 +24,7 @@ enum ws_status {
 typedef struct {
 	uint32_t fd;
 	uint32_t status;
-	struct sockaddr_storage remoteaddr;
+	struct sockaddr_storage remote_addr;
 } ws_connection_t;
 
 typedef struct {
@@ -41,5 +41,5 @@ int send_ws_frame(ws_connection_t *, char *buf, int len);
 int receive_ws_frame(ws_connection_t *, char *buf, int len);
 
 // http stuff
-void parse_http_request(char *data, char *method, char *http_version, http_header_t **, int *count);
+int parse_http_request(char *data, char *method, char *http_version, http_header_t **, int *count);
 void build_http_reponse(int status_code, http_header_t *reponse_headers);
