@@ -1,3 +1,5 @@
+#include <stddef.h>
+#include <string.h>
 #include "utils.h"
 
 char *split(char *str, const char *delim) {	
