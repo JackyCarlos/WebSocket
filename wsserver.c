@@ -20,8 +20,7 @@ enum handshake_headers {
 };
 
 int
-ws_server() 
-{
+ws_server(void) {
 	listening_fd = get_listener_socket();
 	if (listening_fd < 0) {
 		return -1;
@@ -33,8 +32,7 @@ ws_server()
 }
 
 ws_connection_t
-*accept_ws_connection()
-{	
+*accept_ws_connection(void) {	
 	int newfd;
 	socklen_t addrlen;
 	struct sockaddr_storage remote_addr;
@@ -53,6 +51,8 @@ ws_connection_t
 	connection->status = CONNECTING;
 	connection->remote_addr = remote_addr;
 
+	printf("success?? %d\n", ws_handshake(connection));
+
 	connections[con_count++] = connection;
 
 	if(con_count == max_con) {
@@ -64,52 +64,80 @@ ws_connection_t
 }
 
 int
-ws_handshake(ws_connection_t *con)
-{
+ws_handshake(ws_connection_t *con) {
 	char method[20], http_version[20], data[2048];
-	http_header_t *request_headers;
+	char *http_response;
+	http_header_t *request_headers, response_headers[5];
 	int hcount, status, ec;
 	
 	status = 0;
 
 	if(recv(con->fd, data, 2048, 0) == -1) {
-		perror("recv");
+		perror("socket recv");
 		return -1;
 	}
 
 	ec = parse_http_request(data, method, http_version, &request_headers, &hcount);
 	if (ec == -1) {
-		// fprintf(stderr, "malformed http request");
+		fprintf(stderr, "malformed http request\n");
 		return -2;
 	}
 
 	if (strcmp(method, "GET") || !strcmp(http_version, "HTTP/1.0")) {
+		fprintf(stderr, "wrong http method\n");
+		response_headers[0] = (http_header_t) { "Allow", "GET" };
+		http_response = build_http_response(405, response_headers, 1);
+		
+		if (send(con->fd, http_response, strlen(http_response), 0) == -1) {
+			perror("socket send");
+		}
+
+		free(http_response);
 		return -3; 
 	}
 
 	for (int i = 0; i < hcount; ++i) {
-		if (!strcmp(request_headers[i].header, "Host"))
+		if (!strcmp(request_headers[i].header, "Host")) {
 			status |= HOST;
-		else if (!(strcmp(request_headers[i].header, "Upgrade") || strcmp(request_headers[i].value, "websocket")))
+		} else if (!(strcmp(request_headers[i].header, "Upgrade") || strcmp(request_headers[i].value, "websocket"))) {
 			status |= UPGRADE;
-		else if (!(strcmp(request_headers[i].header, "Connection") || strcmp(request_headers[i].value, "Upgrade")))
+		} else if (!(strcmp(request_headers[i].header, "Connection") || strcmp(request_headers[i].value, "Upgrade"))) {
 			status |= CONNECTION;
-		else if (!strcmp(request_headers[i].header, "Sec-WebSocket-Key"))
+		} else if (!strcmp(request_headers[i].header, "Sec-WebSocket-Key") && strlen(request_headers[i].value) == 16) {
 			status |= WSKEY;
-		else if (!(strcmp(request_headers[i].header, "Sec-WebSocket-Version") || strcmp(request_headers[i].value, "13")))
+		} else if (!(strcmp(request_headers[i].header, "Sec-WebSocket-Version") || strcmp(request_headers[i].value, "13"))) {
 			status |= WSVERSION;
-		else if (!strcmp(request_headers[i].header, "Origin"))
+		} else if (!strcmp(request_headers[i].header, "Origin")) {
 			status |= ORIGIN;
-		else if (!strcmp(request_headers[i].header, "Sec-WebSocket-Protocol"))
+		} else if (!strcmp(request_headers[i].header, "Sec-WebSocket-Protocol")) {
 			;
-		else if (!strcmp(request_headers[i].header, "Sec-WebSocket-Extension"))
+		} if (!strcmp(request_headers[i].header, "Sec-WebSocket-Extension")) {
 			;
+		}
 	}	
 
 	if (status < 248) {
+		fprintf(stderr, "bad request\n");
+
+		if ((status & WSVERSION) == 1) {
+			http_response = build_http_response(426, NULL, 0);
+		} else {
+			http_response = build_http_response(400, NULL, 0);
+		}
+		
+		if (send(con->fd, http_response, strlen(http_response), 0) == -1) {
+			perror("socket send");
+		}
+
+		free(http_response);
 		return -4;
 	}
 	
+
+
+
+
+
 	con->status = OPEN;
 	free(request_headers);
 	return 0;
@@ -117,10 +145,8 @@ ws_handshake(ws_connection_t *con)
 
 // returns -1 on failure, on success return created socket fd
 int 
-get_listener_socket(void)
-{
+get_listener_socket(void) {
 	int listener, yes, rv;
-
 	struct addrinfo hints, *ai, *p;
 
 	memset(&hints, 0, sizeof hints);
