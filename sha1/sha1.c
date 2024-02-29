@@ -180,21 +180,3 @@ f3(uint32_t B, uint32_t C, uint32_t D)
 {
 	return B & C | B & D | C & D;
 }
-
-/*
-
-Curry Pulver
-Kurkuma Pulver
-Kräuter der Provence
-Smoked Paprika
-
-
-Cayenne Pfeffer Pulver
-Kreuzkümmel Cumin
-Paprika scharf
-Paprika Edelsüß
-
-
-
-
-*/
