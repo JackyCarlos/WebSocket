@@ -3,7 +3,7 @@ CFLAGS		=
 LDFLAGS		= 
 OBJFILES	= main.o wsserver.o utils/utils.o http.o sha1/sha1.o 
 TARGET		= wsserver
-INC			= -I include 
+INC			= -I ./include -I ./sha1 -I ./base64
 OBJDIR		= obj
 SRCDIR		= src
 
