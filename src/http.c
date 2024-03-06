@@ -72,7 +72,7 @@ parse_http_request(char *request, char *method, char *http_version, http_header_
 void build_http_response(char *http_response, int status_code, http_header_t *response_headers, int hcount) {
 	int i;
 
-	if (!(status_code == 101 || status_code == 400 || status_code == 405)) {
+	if (!(status_code == 101 || status_code == 400 || status_code == 405 || status_code == 426)) {
 		return;
 	}
 
