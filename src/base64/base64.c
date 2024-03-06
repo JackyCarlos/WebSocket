@@ -9,18 +9,16 @@ static const uint8_t input_alphabet[] = { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'
                                        '8', '9', '+', '/' };
 static uint8_t *output_alphabet = NULL;
 
-char * 
-base64_encode(const char *input_data, uint32_t input_data_length) {
-    uint32_t output_length, triple;
+void 
+base64_encode(const char *input_data, const uint32_t input_data_length, char *output_data, uint32_t *output_data_length) {
+    uint32_t triple;
     int j, padding;
-    char *output_data;
     
-    output_length = (input_data_length + 2) / 3 * 4;
-    output_data = (char *) malloc(output_length + 1);
+    *output_data_length = (input_data_length + 2) / 3 * 4;
     padding = input_data_length % 3;
 
     if (output_data == NULL) {
-        return NULL;
+        return;
     }
 
     j = 0;
@@ -41,31 +39,26 @@ base64_encode(const char *input_data, uint32_t input_data_length) {
     for (int i = 0; padding && i < 3 - padding; ++i) {
         output_data[--j] = '=';
     }
-
-    return output_data;
 }
 
-char *
-base64_decode(const char *input_data, uint32_t input_data_length) {
-    char *output_data;
-    uint32_t output_length, quadruple;
+void
+base64_decode(const char *input_data, const uint32_t input_data_length, char *output_data, uint32_t *output_data_length) {
+    uint32_t quadruple;
     int j; 
 
     if (output_alphabet == NULL) {
         create_output_alphabet();
     }
     
-    output_length = input_data_length / 4 * 3;
+    *output_data_length = input_data_length / 4 * 3;
 
     while (input_data[input_data_length - 1] == '=') {
-        --output_length;
+        --*output_length;
         --input_data_length;
     }
 
-    output_data = (char *) malloc(output_length + 1);
-
     if (output_data == NULL) {
-        return NULL;
+        return;
     }
 
     j = 0;
@@ -82,8 +75,6 @@ base64_decode(const char *input_data, uint32_t input_data_length) {
     }
 
     output_data[j] = '\0';
-
-    return output_data;
 }
 
 static void 
