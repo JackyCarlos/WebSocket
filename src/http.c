@@ -19,7 +19,7 @@ static char *http_response_base = "HTTP/1.1 %d %s\r\n"
 
 int 
 parse_http_request(char *request, char *method, char *http_version, http_header_t **request_headers, int *count) {	
-	char *request_line, *header_end, *raw_header, *header;
+	char *request_line, *header_end, *raw_header;
 	int header_count, max_header;
 	char **raw_headers;
 
@@ -73,7 +73,7 @@ void build_http_response(char *http_response, int status_code, http_header_t *re
 	int i;
 
 	if (!(status_code == 101 || status_code == 400 || status_code == 405)) {
-		return NULL;
+		return;
 	}
 
 	for (i = 0; i < sizeof(http_codes); ++i) {
@@ -91,6 +91,5 @@ void build_http_response(char *http_response, int status_code, http_header_t *re
 	}
 
 	strcat(http_response, "\r\n");
-	
-	return http_response;
 }
+
