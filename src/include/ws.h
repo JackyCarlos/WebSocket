@@ -33,13 +33,12 @@ typedef struct {
 } http_header_t;
 
 int ws_server(void);
-
 ws_connection_t *accept_ws_connection(void);
-
 int ws_handshake(ws_connection_t *);
+
 int send_ws_frame(ws_connection_t *, char *buf, int len);
 int receive_ws_frame(ws_connection_t *, char *buf, int len);
 
 // http stuff
 int parse_http_request(char *data, char *method, char *http_version, http_header_t **, int *count);
-char *build_http_response(int status_code, http_header_t *response_headers, int hcount);
+void build_http_response(char *http_response, int status_code, http_header_t *response_headers, int hcount);
