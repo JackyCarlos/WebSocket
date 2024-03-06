@@ -7,6 +7,7 @@
 #include "base64.h"
 
 static int get_listener_socket(void);
+static int ws_handshake(ws_connection_t *);
 static void build_accept_header(char *header, char *sec_websocket_key);
 
 static ws_connection_t **connections;
@@ -48,13 +49,14 @@ ws_connection_t
 		perror("accept error");
 		return NULL;
 	}
+	
 
 	connection = (ws_connection_t *) malloc(sizeof(ws_connection_t));
 	connection->fd = newfd;
 	connection->status = CONNECTING;
 	connection->remote_addr = remote_addr;
 
-	printf("success?? %d\n", ws_handshake(connection));
+	while (ws_handshake(connection) != 0) { ;}
 
 	connections[con_count++] = connection;
 
@@ -66,7 +68,7 @@ ws_connection_t
 	return connection;
 }
 
-int
+static int
 ws_handshake(ws_connection_t *con) {
 	char method[20], http_version[20], data[2048], http_response[200];
 	http_header_t *request_headers, response_headers[3];
