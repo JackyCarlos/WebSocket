@@ -1,5 +1,5 @@
 #include "ws.h"
-#include "utils/utils.h"
+#include "utils.h"
 
 typedef struct {
 	int status_code;
