@@ -34,7 +34,6 @@ typedef struct {
 
 int ws_server(void);
 ws_connection_t *accept_ws_connection(void);
-int ws_handshake(ws_connection_t *);
 
 int send_ws_frame(ws_connection_t *, char *buf, int len);
 int receive_ws_frame(ws_connection_t *, char *buf, int len);
