@@ -4,6 +4,7 @@
 
 #include "ws.h"
 #include "sha1.h"
+#include "base64.h"
 
 static int get_listener_socket(void);
 static void build_accept_header(char *header, char *sec_websocket_key);
@@ -67,13 +68,10 @@ ws_connection_t
 
 int
 ws_handshake(ws_connection_t *con) {
-	char method[20], http_version[20], data[2048];
-	char *http_response;
-	http_header_t *request_headers, response_headers[5];
+	char method[20], http_version[20], data[2048], http_response[200];
+	http_header_t *request_headers, response_headers[3];
 	int hcount, status, ec;
-
 	char *sec_websocket_key;
-	uint8_t hash_bytes[20];
 	
 	status = 0;
 
@@ -91,13 +89,12 @@ ws_handshake(ws_connection_t *con) {
 	if (strcmp(method, "GET") || !strcmp(http_version, "HTTP/1.0")) {
 		fprintf(stderr, "wrong http method\n");
 		response_headers[0] = (http_header_t) { "Allow", "GET" };
-		http_response = build_http_response(405, response_headers, 1);
+		build_http_response(http_response, 405, response_headers, 1);
 		
 		if (send(con->fd, http_response, strlen(http_response), 0) == -1) {
 			perror("socket send");
 		}
 
-		free(http_response);
 		return -3; 
 	}
 
@@ -125,49 +122,49 @@ ws_handshake(ws_connection_t *con) {
 	if (status < 248) {
 		fprintf(stderr, "bad request\n");
 		response_headers[0] = (http_header_t) { "Sec-WebSocket-Version", "13" };
-		http_response = ((status & WSVERSION) == WSVERSION) ? build_http_response(400, NULL, 0) : build_http_response(426, response_headers, 1);
+		((status & WSVERSION) == WSVERSION) ? build_http_response(http_response, 400, NULL, 0) : build_http_response(http_response, 426, response_headers, 1);
 		
 		if (send(con->fd, http_response, strlen(http_response), 0) == -1) {
 			perror("socket send");
 		}
 
-		free(http_response);
 		return -4;
 	}
 
-	build_accept_header(hash_bytes, sec_websocket_key);
-
-
+	char accept_header[29];
+	build_accept_header(accept_header, sec_websocket_key);
 
 	response_headers[0] = (http_header_t) { "Upgrade", "websocket" };
 	response_headers[1] = (http_header_t) { "Connection", "Upgrade" };
-	
+	response_headers[2] = (http_header_t) { "Sec-WebSocket-Accept", accept_header };
 
-
-	http_response = build_http_response(101, response_headers, 0);
-
+	build_http_response(http_response, 101, response_headers, 3);
+	if (send(con->fd, http_response, strlen(http_response), 0) == -1) {
+		perror("socket send");
+	}
 
 	con->status = OPEN;
 	free(request_headers);
 	return 0;
 }
 
-static void build_accept_header(char *header, char *sec_websocket_key) {
+static void build_accept_header(char *accept_header, char *sec_websocket_key) {
 	char raw[61];
 	uint8_t hash_bytes[20];
 	sha1_context_t context;
+	uint32_t len;
 	
-	raw[0] = '\0';
-	strcat(raw, sec_websocket_key);
+	strcpy(raw, sec_websocket_key);
 	strcat(raw, GUID);
 	
 	// hashing
 	sha1_init(&context);
 	sha1_input((uint8_t *) raw, 60, &context);
 	sha1_output(hash_bytes, &context);
+
+	base64_encode(hash_bytes, 20, accept_header, &len);
 }
 
-// returns -1 on failure, on success return created socket fd
 int 
 get_listener_socket(void) {
 	int listener, yes, rv;
