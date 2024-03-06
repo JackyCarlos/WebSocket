@@ -166,7 +166,7 @@ generate_words(uint8_t input_bytes[], uint32_t message_words[])
 static uint32_t 
 f1(uint32_t B, uint32_t C, uint32_t D) 
 {
-	return B & C | ~B & D;
+	return (B & C) | (~B & D);
 }
 
 static uint32_t 
@@ -178,5 +178,5 @@ f2 (uint32_t B, uint32_t C, uint32_t D)
 static uint32_t 
 f3(uint32_t B, uint32_t C, uint32_t D) 
 {
-	return B & C | B & D | C & D;
+	return (B & C) | (B & D) | (C & D);
 }
