@@ -42,7 +42,7 @@ base64_encode(const uint8_t *input_data, const uint32_t input_data_length, char 
 }
 
 void
-base64_decode(const uint8_t *input_data, uint32_t input_data_length, char *output_data, uint32_t *output_data_length) {
+base64_decode(const char *input_data, uint32_t input_data_length, uint8_t *output_data, uint32_t *output_data_length) {
     uint32_t quadruple;
     int j; 
 
@@ -88,4 +88,3 @@ create_output_alphabet(void) {
         output_alphabet[input_alphabet[i]] = i; 
     }
 }
-
