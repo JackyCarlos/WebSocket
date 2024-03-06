@@ -30,14 +30,17 @@ ws_server(void) {
 		return -1;
 	}
 
-	connections = malloc(sizeof(ws_connection_t *) * max_con);
+	connections = (ws_connection_t **) malloc(sizeof(ws_connection_t *) * max_con);
+	if (connections == NULL) {
+		return -1;
+	}
 
 	return 0;
 }
 
 ws_connection_t
 *accept_ws_connection(void) {	
-	int newfd;
+	int newfd, status;
 	socklen_t addrlen;
 	struct sockaddr_storage remote_addr;
 	ws_connection_t *connection;
@@ -49,14 +52,23 @@ ws_connection_t
 		perror("accept error");
 		return NULL;
 	}
-	
 
 	connection = (ws_connection_t *) malloc(sizeof(ws_connection_t));
+	if (connection == NULL) {
+		return NULL;
+	}
+
 	connection->fd = newfd;
 	connection->status = CONNECTING;
 	connection->remote_addr = remote_addr;
 
-	while (ws_handshake(connection) != 0) { ;}
+	status = -1;
+	while (status != 0) {
+		status = ws_handshake(connection);
+		if (status == -2) {
+			return NULL;
+		}
+	}
 
 	connections[con_count++] = connection;
 
@@ -74,30 +86,35 @@ ws_handshake(ws_connection_t *con) {
 	http_header_t *request_headers, response_headers[3];
 	int hcount, status, ec;
 	char *sec_websocket_key;
+
+	int numbytes;
 	
 	status = 0;
 
-	if(recv(con->fd, data, 2048, 0) == -1) {
+	numbytes = recv(con->fd, data, 2048, 0);
+	if(numbytes == -1) {
 		perror("socket recv");
 		return -1;
+	} else if (numbytes == 0) {
+		return -2;
 	}
 
 	ec = parse_http_request(data, method, http_version, &request_headers, &hcount);
 	if (ec == -1) {
 		fprintf(stderr, "malformed http request\n");
-		return -2;
+		return -3;
 	}
 
 	if (strcmp(method, "GET") || !strcmp(http_version, "HTTP/1.0")) {
 		fprintf(stderr, "wrong http method\n");
 		response_headers[0] = (http_header_t) { "Allow", "GET" };
 		build_http_response(http_response, 405, response_headers, 1);
-		
+
 		if (send(con->fd, http_response, strlen(http_response), 0) == -1) {
 			perror("socket send");
 		}
 
-		return -3; 
+		return -4; 
 	}
 
 	for (int i = 0; i < hcount; ++i) {
@@ -125,12 +142,12 @@ ws_handshake(ws_connection_t *con) {
 		fprintf(stderr, "bad request\n");
 		response_headers[0] = (http_header_t) { "Sec-WebSocket-Version", "13" };
 		((status & WSVERSION) == WSVERSION) ? build_http_response(http_response, 400, NULL, 0) : build_http_response(http_response, 426, response_headers, 1);
-		
+	
 		if (send(con->fd, http_response, strlen(http_response), 0) == -1) {
 			perror("socket send");
 		}
 
-		return -4;
+		return -5;
 	}
 
 	char accept_header[29];
