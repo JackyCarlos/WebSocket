@@ -69,17 +69,14 @@ parse_http_request(char *request, char *method, char *http_version, http_header_
 	return 0;
 }
 
-char *build_http_response(int status_code, http_header_t *response_headers, int hcount) {
+void build_http_response(char *http_response, int status_code, http_header_t *response_headers, int hcount) {
 	int i;
-	char *http_response;
-	
-	http_response = (char *) malloc(1000);
-	
+
 	if (!(status_code == 101 || status_code == 400 || status_code == 405)) {
 		return NULL;
 	}
 
-	for (i = 0; i < 3; ++i) {
+	for (i = 0; i < sizeof(http_codes); ++i) {
 		if (http_codes[i].status_code == status_code) {
 			break;
 		}
