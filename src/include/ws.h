@@ -32,7 +32,7 @@ typedef struct {
 	char *value;
 } http_header_t;
 
-int ws_server(void);
+int ws_server(char *host_address, char *port);
 ws_connection_t *accept_ws_connection(void);
 
 int send_ws_frame(ws_connection_t *, char *buf, int len);
