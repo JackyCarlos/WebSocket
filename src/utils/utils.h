@@ -1,1 +1,13 @@
+/***************************************************************************//**
+
+  @file         utils.h
+
+  @author       Robert Eikmanns
+
+  @date         Thursday, 7 March 2024
+
+  @brief        Declarations for helper functions
+
+*******************************************************************************/
+
 char *split(char *str, const char *delim);

@@ -1,7 +1,25 @@
+/***************************************************************************//**
+
+  @file         utils.c
+
+  @author       Robert Eikmanns
+
+  @date         Thursday, 7 March 2024
+
+  @brief        Implementations of helper functions
+
+*******************************************************************************/
+
 #include <stddef.h>
 #include <string.h>
 #include "utils.h"
 
+/**
+ *  @brief                      decode a set of bytes to base64
+ *
+ *  @param str                  pointer to the string to be split
+ *  @param input_data_length    pointer to the delimiter string
+ */
 char *split(char *str, const char *delim) {	
 	static char *string;
 	char *str_to_return, *substr;
