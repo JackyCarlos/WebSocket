@@ -25,9 +25,9 @@ static const uint32_t K3 = 0x8f1bbcdc;
 static const uint32_t K4 = 0xca62c1d6;
 
 /**
- *  @brief initialize a sha1 context struct
+ *  @brief           initialize a sha1 context struct
  *
- *  @param context	pointer to a sha1_context_t struct to initialize	
+ *  @param context   pointer to a sha1_context_t struct to initialize   
  */
 void 
 sha1_init(sha1_context_t *context) {
@@ -41,11 +41,11 @@ sha1_init(sha1_context_t *context) {
 }
 
 /**
- *  @brief hash a given array of bytes
+ *  @brief                  hash a given array of bytes
  *
- *  @param message			pointer to input bytes	
- *  @param message_length	amount of input bytes	
- *  @param context			pointer to a sha1_context_t struct to use for calculating the hash	
+ *  @param message          pointer to input bytes   
+ *  @param message_length   amount of input bytes   
+ *  @param context          pointer to a sha1_context_t struct to use for calculating the hash   
  */
 void 
 sha1_input(uint8_t *message, uint64_t message_length, sha1_context_t *context) {
@@ -66,9 +66,9 @@ sha1_input(uint8_t *message, uint64_t message_length, sha1_context_t *context) {
 } 
 
 /**
- *  @brief calculate intermediate hash for a message block
+ *  @brief           calculate intermediate hash for a message block
  *
- *  @param context	pointer to a sha1_context_t struct to use for calculating the hash	
+ *  @param context   pointer to a sha1_context_t struct to use for calculating the hash   
  */
 void 
 sha1_process_block(sha1_context_t *context) {
@@ -93,7 +93,7 @@ sha1_process_block(sha1_context_t *context) {
         B = temp;
     }
     
-    for (i = 20; i < 40; ++i) {	
+    for (i = 20; i < 40; ++i) {   
         temp = A;
         A = E + f2(B, C, D) + shift_left(A, 5) + message_words[i] + K2;
         E = D;
@@ -102,7 +102,7 @@ sha1_process_block(sha1_context_t *context) {
         B = temp;
     } 
     
-    for (i = 40; i < 60; ++i) {	
+    for (i = 40; i < 60; ++i) {   
         temp = A;
         A = E + f3(B, C, D) + shift_left(A, 5) + message_words[i] + K3;
         E = D;
@@ -111,7 +111,7 @@ sha1_process_block(sha1_context_t *context) {
         B = temp;
     } 
     
-    for (i = 60; i < 80; ++i) {	
+    for (i = 60; i < 80; ++i) {   
         temp = A;
         A = E + f2(B, C, D) + shift_left(A, 5) + message_words[i] + K4;
         E = D;
@@ -126,13 +126,13 @@ sha1_process_block(sha1_context_t *context) {
     context->intermediate_hash[3] += D;
     context->intermediate_hash[4] += E;
 
-    context->index = 0;		
+    context->index = 0;      
 }
 
 /**
- *  @brief pad the final message block(s) and calculate final hash
+ *  @brief           pad the final message block(s) and calculate final hash
  *
- *  @param context	pointer to a sha1_context_t struct to use for calculating the hash	
+ *  @param context   pointer to a sha1_context_t struct to use for calculating the hash   
  */
 void 
 sha1_pad_message(sha1_context_t *context) {
@@ -156,40 +156,40 @@ sha1_pad_message(sha1_context_t *context) {
         context->message_block[context->index++] = context->message_length >> j * 8;
     }
 
-    sha1_process_block(context);	
+    sha1_process_block(context);   
 }
 
 /**
- *  @brief copy the intermediate hash out of a sha1_context_t struct 
- *	
- *	@param message_digest	pointer to copy the hash bytes to 
- *  @param context			pointer to a sha1_context_t struct to use for calculating the hash	
+ *  @brief                    copy the intermediate hash out of a sha1_context_t struct 
+ *   
+ *  @param message_digest     pointer to copy the hash bytes to 
+ *  @param context            pointer to a sha1_context_t struct to use for calculating the hash   
  */
 void 
 sha1_output(uint8_t *message_digest, sha1_context_t *context) {
     int i;
     for (i = 0; i < HASHSIZE; ++i) {
-        message_digest[i] = context->intermediate_hash[i/4] >> (3 - i % 4) * 8; 	
+        message_digest[i] = context->intermediate_hash[i/4] >> (3 - i % 4) * 8;    
     }
 }
 
 /**
- *  @brief shift an integer by a defined set of positions
- *	
- *	@param val	integer to shift 
- *  @param x	amount of positions to shift
- *	@return 	shifted result
+ *  @brief       shift an integer by a defined set of positions
+ *   
+ *  @param val   integer to shift 
+ *  @param x     amount of positions to shift
+ *  @return      shifted result
  */
-static uint32_t 
+static uint32_t     
 shift_left(uint32_t val, const int x) {
     return val << x | val >> (32 - x);
 }
 
 /**
- *  @brief generate 64 message 32-bit words out of 16 input bytes
- *	
- *	@param input_bytes		array of bytes to shift 
- *  @param message_words	array of 32-bit words to store generated words	
+ *  @brief                 generate 64 message 32-bit words out of 16 input bytes
+ *   
+ *  @param input_bytes     array of bytes to shift 
+ *  @param message_words   array of 32-bit words to store generated words   
  */
 static void 
 generate_words(uint8_t *input_bytes, uint32_t *message_words) {
