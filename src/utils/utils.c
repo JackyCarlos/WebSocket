@@ -22,7 +22,7 @@
  *  @brief                      decode a set of bytes to base64
  *
  *  @param str                  pointer to the string to be split
- *  @param input_data_length    pointer to the delimiter string
+ *  @param delim                pointer to the delimiter string
  */
 char 
 *split(char *str, const char *delim) {	
