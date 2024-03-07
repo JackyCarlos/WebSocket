@@ -1,3 +1,15 @@
+/***************************************************************************//**
+
+  @file         base64.c
+
+  @author       Robert Eikmanns
+
+  @date         Thursday, 7 March 2024
+
+  @brief        base64 implementation
+
+*******************************************************************************/
+
 #include <stdlib.h>
 #include "base64.h"
 
@@ -9,6 +21,14 @@ static const uint8_t input_alphabet[] = { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'
                                        '8', '9', '+', '/' };
 static uint8_t *output_alphabet = NULL;
 
+/**
+ *  @brief                      encode a set of bytes to base64
+ *
+ *  @param input_data           pointer to input bytes
+ *  @param input_data_length    the amount of input bytes
+ *  @param output_data          pointer to the array to store the encoded bytes
+ *  @param output_data_length   length of the encoded output  
+ */
 void 
 base64_encode(const uint8_t *input_data, const uint32_t input_data_length, char *output_data, uint32_t *output_data_length) {
     uint32_t triple;
@@ -41,6 +61,14 @@ base64_encode(const uint8_t *input_data, const uint32_t input_data_length, char 
     }
 }
 
+/**
+ *  @brief                      decode a set of bytes to base64
+ *
+ *  @param input_data           pointer to input bytes
+ *  @param input_data_length    the amount of input bytes
+ *  @param output_data          pointer to the array to store the decoded bytes
+ *  @param output_data_length   length of the decoded output  
+ */
 void
 base64_decode(const char *input_data, uint32_t input_data_length, uint8_t *output_data, uint32_t *output_data_length) {
     uint32_t quadruple;
@@ -77,6 +105,10 @@ base64_decode(const char *input_data, uint32_t input_data_length, uint8_t *outpu
     output_data[j] = '\0';
 }
 
+/**
+ *  @brief    generate reverse table to lookup encoded characters
+ *
+ */
 static void 
 create_output_alphabet(void) {
     output_alphabet = (uint8_t *) malloc(256);
