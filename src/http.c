@@ -1,3 +1,15 @@
+/***************************************************************************//**
+
+  @file         http.c
+
+  @author       Robert Eikmanns
+
+  @date         Thursday, 7 March 2024
+
+  @brief        http parsing and building http responses
+
+*******************************************************************************/
+
 #include "ws.h"
 #include "utils.h"
 
@@ -17,6 +29,16 @@ static char *http_response_base = "HTTP/1.1 %d %s\r\n"
 						   		 "Server: null\r\n"
 						   		 "Content-Length: 0\r\n";
 
+/**
+ *  @brief                      parse an http response and extract the corresponding headers
+ *
+ *  @param request              pointer to the raw request bytes
+ *  @param method               pointer to the array where to store the given http method
+ *  @param http_version         pointer to the array where to store the given http version
+ *  @param request_headers      pointer to the array of request_headers of the calling instance
+ *  @param count				pointer to the integer storing the amount of parsed headers of the calling instance
+ *  @return                     0 if the parsing was successful, or -1 in case of a parsing error
+ */
 int 
 parse_http_request(char *request, char *method, char *http_version, http_header_t **request_headers, int *count) {	
 	char *request_line, *header_end, *raw_header;
@@ -69,6 +91,14 @@ parse_http_request(char *request, char *method, char *http_version, http_header_
 	return 0;
 }
 
+/**
+ *  @brief                      build an http response out of a status code and some response headers
+ *
+ *  @param http_response        pointer to the array storing the build http response
+ *  @param status_code          the http status code to send
+ *  @param response_headers     pointer to response headers
+ *  @param hcount               amount of headers to send
+ */
 void build_http_response(char *http_response, int status_code, http_header_t *response_headers, int hcount) {
 	int i;
 
