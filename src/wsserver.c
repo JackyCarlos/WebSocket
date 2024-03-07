@@ -1,12 +1,20 @@
-/*
- *	wsserver.c -- a simple web socket server 
- */
+/***************************************************************************//**
+
+  @file         wsserver.c
+
+  @author       Robert Eikmanns
+
+  @date         Thursday, 7 March 2024
+
+  @brief        core functionalities of the websocket server
+
+*******************************************************************************/
 
 #include "ws.h"
 #include "sha1.h"
 #include "base64.h"
+#include "utils.h"
 
-static int get_listener_socket(char *host_address, char *port);
 static int ws_handshake(ws_connection_t *);
 static void build_accept_header(char *header, char *sec_websocket_key);
 
@@ -23,6 +31,13 @@ enum handshake_headers {
 	ORIGIN = 4
 };
 
+/**
+ *  @brief                  create the websocket server
+ *
+ *  @param host_address     the host ip address to listen for incomming connections. May be NULL   
+ *  @param port             the port to listen on, allowed values: 1024-65535   
+ *  @return                 0 if creation was successful, or -1 in case of an error
+ */
 int
 ws_server(char *host_address, char *port) {
 	listening_fd = get_listener_socket(host_address, port);
@@ -37,7 +52,12 @@ ws_server(char *host_address, char *port) {
 
 	return 0;
 }
-
+/**
+ *  @brief                  wait for a new web socket connection request and initialize the web socket handshake
+ *
+ *  @return                 a ws_connection_t pointer representing a web socket connection in the OPEN connection status, 
+ *                              NULL in case the remote host closed the underlying tcp connection
+ */
 ws_connection_t
 *accept_ws_connection(void) {	
 	int newfd, status;
@@ -80,6 +100,14 @@ ws_connection_t
 	return connection;
 }
 
+/**
+ *  @brief          process the web socket handshake 
+ *
+ *  @param con      the web socket connection to use for the handshake. The connection is bound to an open tcp connection to the client   
+ *  @return         0 if the server agrees to exchange data via the websocket connection, or -1 if there is an error when receiving data,
+ *                     or -2 if the client closed the tcp connection, or -3 if the client sent a malformed http request, 
+ *                     or -4 if the client used an unallowed http method in the request, or -5 in case of missing or corrup request headers
+ */
 static int
 ws_handshake(ws_connection_t *con) {
 	char method[20], http_version[20], data[2048], http_response[200];
@@ -167,6 +195,12 @@ ws_handshake(ws_connection_t *con) {
 	return 0;
 }
 
+/**
+ *  @brief                         build the value of the 'Sec-WebSocket-Accept' http response header
+ *
+ *  @param accept_header           array in which the generated header is to be saved 
+ *  @param sec_websocket_accept    the value of the retrieved 'Sec-WebSocket-Key' http request header          
+ */
 static void build_accept_header(char *accept_header, char *sec_websocket_key) {
 	char raw[61];
 	uint8_t hash_bytes[20];
@@ -182,55 +216,4 @@ static void build_accept_header(char *accept_header, char *sec_websocket_key) {
 	sha1_output(hash_bytes, &context);
 
 	base64_encode(hash_bytes, 20, accept_header, &len);
-}
-
-int 
-get_listener_socket(char *host_address, char *port) {
-	int listener, yes, rv;
-	struct addrinfo hints, *ai, *p;
-
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-	if (host_address == NULL) hints.ai_flags = AI_PASSIVE;
-
-	rv = getaddrinfo(host_address, port, &hints, &ai);
-
-	if (rv != 0) {
-		fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(errno));
-		return -1;
-	}
-
-	for (p = ai; p != NULL; p = p->ai_next) {
-		listener = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-		if (listener < 0) {
-			perror("socket error");
-			continue;
-		}
-
-		if(setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-			perror("setsockopt error");
-			close(listener);
-			return -1;
-		}
-
-		if (bind(listener, p->ai_addr, p->ai_addrlen) < 0) {
-			perror("bind error");
-			close(listener);
-			continue;
-		}
-
-		break;
-	}
-
-	freeaddrinfo(ai);
-	if (p == NULL) {
-		return -1;
-	}
-
-	if (listen(listener, 10) == -1) {
-		fprintf(stderr, "listen error: %s\n", strerror(errno));
-	}
-
-	return listener;
 }
