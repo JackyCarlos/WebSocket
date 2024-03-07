@@ -11,3 +11,4 @@
 *******************************************************************************/
 
 char *split(char *str, const char *delim);
+int get_listener_socket(char *host_address, char *port);
