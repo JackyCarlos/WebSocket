@@ -1,3 +1,15 @@
+/***************************************************************************//**
+
+  @file         sha1.c
+
+  @author       Robert Eikmanns
+
+  @date         Thursday, 7 March 2024
+
+  @brief        Declarations for SHA-1 implementaion
+
+*******************************************************************************/
+
 #include <stdint.h>
 
 #define 	HASHSIZE	20 		// hashsize in bytes
