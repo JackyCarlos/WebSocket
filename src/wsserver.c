@@ -6,7 +6,7 @@
 #include "sha1.h"
 #include "base64.h"
 
-static int get_listener_socket(void);
+static int get_listener_socket(char *host_address, char *port);
 static int ws_handshake(ws_connection_t *);
 static void build_accept_header(char *header, char *sec_websocket_key);
 
@@ -24,8 +24,8 @@ enum handshake_headers {
 };
 
 int
-ws_server(void) {
-	listening_fd = get_listener_socket();
+ws_server(char *host_address, char *port) {
+	listening_fd = get_listener_socket(host_address, port);
 	if (listening_fd < 0) {
 		return -1;
 	}
@@ -185,16 +185,16 @@ static void build_accept_header(char *accept_header, char *sec_websocket_key) {
 }
 
 int 
-get_listener_socket(void) {
+get_listener_socket(char *host_address, char *port) {
 	int listener, yes, rv;
 	struct addrinfo hints, *ai, *p;
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_PASSIVE;
+	if (host_address == NULL) hints.ai_flags = AI_PASSIVE;
 
-	rv = getaddrinfo(NULL, "9999", &hints, &ai);
+	rv = getaddrinfo(host_address, port, &hints, &ai);
 
 	if (rv != 0) {
 		fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(errno));
