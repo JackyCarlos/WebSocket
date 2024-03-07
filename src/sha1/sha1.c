@@ -4,7 +4,7 @@
 
   @author       Robert Eikmanns
 
-  @date         Thursday,  7 March 2024
+  @date         Thursday, 7 March 2024
 
   @brief        SHA-1 implementation
 
