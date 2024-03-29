@@ -19,7 +19,7 @@
 #include "utils.h"
 
 /**
- *  @brief                      decode a set of bytes to base64
+ *  @brief                      split a string on a given string
  *
  *  @param str                  pointer to the string to be split
  *  @param delim                pointer to the delimiter string
