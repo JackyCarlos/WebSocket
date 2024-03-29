@@ -92,10 +92,10 @@ base64_decode(const char *input_data, uint32_t input_data_length, uint8_t *outpu
     j = 0;
 
     for (int i = 0; i < input_data_length;) {
-        quadruple  = output_alphabet[input_data[i++]] << 18;
-        quadruple |= (i < input_data_length) ? output_alphabet[input_data[i++]] << 12 : 0;
-        quadruple |= (i < input_data_length) ? output_alphabet[input_data[i++]] << 6 : 0;
-        quadruple |= (i < input_data_length) ? output_alphabet[input_data[i++]] : 0;
+        quadruple  = output_alphabet[(int) input_data[i++]] << 18;
+        quadruple |= (i < input_data_length) ? output_alphabet[(int) input_data[i++]] << 12 : 0;
+        quadruple |= (i < input_data_length) ? output_alphabet[(int) input_data[i++]] << 6 : 0;
+        quadruple |= (i < input_data_length) ? output_alphabet[(int) input_data[i++]] : 0;
 
         output_data[j++] = quadruple >> 16;
         output_data[j++] = quadruple >> 8 & 0xFF;
