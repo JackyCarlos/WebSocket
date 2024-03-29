@@ -14,6 +14,7 @@
 #include "sha1.h"
 #include "base64.h"
 #include "utils.h"
+#include "http.h"
 
 static int ws_handshake(ws_connection_t *);
 static void build_accept_header(char *header, char *sec_websocket_key);
@@ -52,6 +53,7 @@ ws_server(char *host_address, char *port) {
 
 	return 0;
 }
+
 /**
  *  @brief                  wait for a new web socket connection request and initialize the web socket handshake
  *
@@ -106,7 +108,7 @@ ws_connection_t
  *  @param con      the web socket connection to use for the handshake. The connection is bound to an open tcp connection to the client   
  *  @return         0 if the server agrees to exchange data via the websocket connection, or -1 if there is an error when receiving data,
  *                     or -2 if the client closed the tcp connection, or -3 if the client sent a malformed http request, 
- *                     or -4 if the client used an unallowed http method in the request, or -5 in case of missing or corrup request headers
+ *                     or -4 if the client used an unallowed http method in the request, or -5 in case of missing or corrupt request headers
  */
 static int
 ws_handshake(ws_connection_t *con) {
