@@ -24,17 +24,8 @@ typedef struct {
 	struct sockaddr_storage remote_addr;
 } ws_connection_t;
 
-typedef struct {
-	char *header;
-	char *value;
-} http_header_t;
-
 int ws_server(char *host_address, char *port);
 ws_connection_t *accept_ws_connection(void);
 
 int send_ws_frame(ws_connection_t *, char *buf, int len);
 int receive_ws_frame(ws_connection_t *, char *buf, int len);
-
-// http stuff
-int parse_http_request(char *data, char *method, char *http_version, http_header_t **, int *count);
-void build_http_response(char *http_response, int status_code, http_header_t *response_headers, int hcount);
