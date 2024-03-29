@@ -1,9 +1,9 @@
 CC			= gcc
 CFLAGS		= -Wall
 LDFLAGS		= 
-OBJFILES	= main.o wsserver.o http.o utils/utils.o sha1/sha1.o base64/base64.o
+OBJFILES	= main.o wsserver.o http/http.o utils/utils.o sha1/sha1.o base64/base64.o
 TARGET		= wsserver
-INC			= -I ./include -I ./sha1 -I ./base64 -I ./utils
+INC			= -I ./include -I ./sha1 -I ./base64 -I ./utils -I ./http
 OBJDIR		= obj
 SRCDIR		= src
 
@@ -15,8 +15,8 @@ $(TARGET): $(OBJFILES)
 main.o: main.c 
 	$(CC) $(INC) $(CFLAGS) -c main.c
 
-http.o: http.c 
-	$(CC) $(INC) $(CFLAGS) -c http.c
+http.o: http/http.c 
+	$(CC) $(INC) $(CFLAGS) -c http/http.c
 
 wsserver.o: wsserver.c 
 	$(CC) $(INC) $(CFLAGS) -c wsserver.c
