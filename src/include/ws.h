@@ -7,6 +7,7 @@
 #include <netdb.h>
 #include <poll.h>
 #include <stdint.h>
+#include <pthread.h>
 
 #define 	MAX_CON 	10
 #define 	GUID		"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
