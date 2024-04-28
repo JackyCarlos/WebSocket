@@ -23,6 +23,7 @@ typedef struct {
 	uint32_t fd;
 	uint32_t status;
 	struct sockaddr_storage remote_addr;
+	pthread_t thread;
 } ws_connection_t;
 
 int ws_server(char *host_address, char *port);
