@@ -19,17 +19,12 @@
 static int ws_handshake(ws_connection_t *);
 static void build_accept_header(char *header, char *sec_websocket_key);
 
-static int ws_server_listener_thread(void *);
-static int ws_connection_thread (void *);
+static void *ws_server_listener_thread(void *);
+static void *ws_connection_thread(void *);
 
 static ws_connection_t **connections;
 static int listening_fd;
 static int con_count = 0, max_con = 10;
-
-typedef struct {
-	char *hostname;
-	char *port;
-} socket_info_t;
 
 enum handshake_headers {
 	HOST = 128, 
@@ -51,114 +46,94 @@ int
 ws_server(char *host_address, char *port) {
 	int rc;
 	pthread_t listener_thread;
-	socket_info_t info;
-	info.hostname = host_address;
-	info.port = port;
-
-	rc = pthread_create(listener_thread, NULL, ws_server_listener_thread, (void *) &info);
-	return rc;
-}
-
-static int
-ws_server_listener_thread(void *socket_info) {
-	char *host_address, *port;
-	int newfd, status;
-	socklen_t addrlen;
-	struct sockaddr_storage remote_addr;
-
-	host_address = ((socket_info_t *) socket_info)->hostname;
-	port = ((socket_info_t *) socket_info)->port;
 
 	listening_fd = get_listener_socket(host_address, port);
 	if (listening_fd < 0) {
 		return -1;
 	}
 
+	connections = (ws_connection_t **) malloc(sizeof(ws_connection_t *) * max_con);
+	if (connections == NULL) {
+		return -1;
+	}
+
+	rc = pthread_create(&listener_thread, NULL, ws_server_listener_thread, NULL);
+	if (rc != 0) {
+		perror("thread create error");
+		return -1;
+	}
+
+	return 0;
+}
+
+static void*
+ws_server_listener_thread(void *param) {
+	int newfd, rc;
+	socklen_t addrlen;
+	struct sockaddr_storage remote_addr;
+	ws_connection_t *connection;
 	addrlen = sizeof(struct sockaddr_storage);
 
 	for (;;) {
 		newfd = accept(listening_fd, (struct sockaddr *) &remote_addr, &addrlen);
 		if (newfd == -1) {
 			perror("accept error");
+			continue;
+		}
+
+		connection = (ws_connection_t *) malloc(sizeof(ws_connection_t));
+		if (connection == NULL) {
 			return NULL;
 		}
 
-		// information to save about the new connection
+		connection->fd = newfd;
+		connection->status = CONNECTING;
+		connection->remote_addr = remote_addr;
 
-		rc = pthread_create(listener_thread, NULL, ws_server_listener_thread, (void *) &info);
 
+
+		pthread_t new_thread;
+		rc = pthread_create(&new_thread, NULL, ws_connection_thread, (void *) connection);
+		if (rc != 0) {
+			perror("thread create error");
+			continue;
+		}
+
+		connection->thread = new_thread;
+		printf("DEBUG\n");
+		fflush(stdout);
+		connections[con_count++] = connection;
+
+		if(con_count == max_con) {
+			max_con += 10;
+			connections = realloc(connections, sizeof(ws_connection_t *) * max_con);
+		}
 	}
 
-	return 0;
+	return (void *) NULL;
 }
 
-static int ws_connection_thread (void *fd) {
+static void*  
+ws_connection_thread(void *connection) {
+	ws_connection_t *ws_connection = (ws_connection_t *) connection;
 
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/**
- *  @brief                  wait for a new web socket connection request and initialize the web socket handshake
- *
- *  @return                 a ws_connection_t pointer representing a web socket connection in the OPEN connection status, 
- *                              NULL in case the remote host closed the underlying tcp connection
- */
-ws_connection_t
-*accept_ws_connection(void) {	
-	int newfd, status;
-	socklen_t addrlen;
-	struct sockaddr_storage remote_addr;
-	ws_connection_t *connection;
-
-	addrlen = sizeof(struct sockaddr_storage);
-
-	newfd = accept(listening_fd, (struct sockaddr *) &remote_addr, &addrlen);
-	if (newfd == -1) {
-		perror("accept error");
-		return NULL;
-	}
-
-	connection = (ws_connection_t *) malloc(sizeof(ws_connection_t));
-	if (connection == NULL) {
-		return NULL;
-	}
-
-	connection->fd = newfd;
-	connection->status = CONNECTING;
-	connection->remote_addr = remote_addr;
-
+	int status;
 	status = -1;
+	
 	while (status != 0) {
 		status = ws_handshake(connection);
 		if (status == -2) {
-			return NULL;
+			// TODO: tidy up the connection
+			pthread_exit(NULL);
 		}
 	}
 
-	connections[con_count++] = connection;
+	ws_connection->status = OPEN;
+	printf("congrats, connection is established\n");
 
-	if(con_count == max_con) {
-		max_con += 10;
-		connections = realloc(connections, sizeof(ws_connection_t *) * max_con);
-	}
+	ws_receive_packet();
 
-	return connection;
+	return (void *) NULL;
 }
 
 /**
@@ -251,7 +226,6 @@ ws_handshake(ws_connection_t *con) {
 		perror("socket send");
 	}
 
-	con->status = OPEN;
 	free(request_headers);
 	return 0;
 }
