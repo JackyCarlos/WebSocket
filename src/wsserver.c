@@ -19,9 +19,17 @@
 static int ws_handshake(ws_connection_t *);
 static void build_accept_header(char *header, char *sec_websocket_key);
 
+static int ws_server_listener_thread(void *);
+static int ws_connection_thread (void *);
+
 static ws_connection_t **connections;
 static int listening_fd;
 static int con_count = 0, max_con = 10;
+
+typedef struct {
+	char *hostname;
+	char *port;
+} socket_info_t;
 
 enum handshake_headers {
 	HOST = 128, 
@@ -39,20 +47,71 @@ enum handshake_headers {
  *  @param port             the port to listen on, allowed values: 1024-65535   
  *  @return                 0 if creation was successful, or -1 in case of an error
  */
-int
+int 
 ws_server(char *host_address, char *port) {
+	int rc;
+	pthread_t listener_thread;
+	socket_info_t info;
+	info.hostname = host_address;
+	info.port = port;
+
+	rc = pthread_create(listener_thread, NULL, ws_server_listener_thread, (void *) &info);
+	return rc;
+}
+
+static int
+ws_server_listener_thread(void *socket_info) {
+	char *host_address, *port;
+	int newfd, status;
+	socklen_t addrlen;
+	struct sockaddr_storage remote_addr;
+
+	host_address = ((socket_info_t *) socket_info)->hostname;
+	port = ((socket_info_t *) socket_info)->port;
+
 	listening_fd = get_listener_socket(host_address, port);
 	if (listening_fd < 0) {
 		return -1;
 	}
 
-	connections = (ws_connection_t **) malloc(sizeof(ws_connection_t *) * max_con);
-	if (connections == NULL) {
-		return -1;
+	addrlen = sizeof(struct sockaddr_storage);
+
+	for (;;) {
+		newfd = accept(listening_fd, (struct sockaddr *) &remote_addr, &addrlen);
+		if (newfd == -1) {
+			perror("accept error");
+			return NULL;
+		}
+
+		// information to save about the new connection
+
+		rc = pthread_create(listener_thread, NULL, ws_server_listener_thread, (void *) &info);
+
 	}
 
 	return 0;
 }
+
+static int ws_connection_thread (void *fd) {
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /**
  *  @brief                  wait for a new web socket connection request and initialize the web socket handshake
