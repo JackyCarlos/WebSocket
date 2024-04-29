@@ -26,6 +26,10 @@ typedef struct {
 	pthread_t thread;
 } ws_connection_t;
 
+typedef struct {
+	
+} ws_packet_t;
+
 int ws_server(char *host_address, char *port);
 ws_connection_t *accept_ws_connection(void);
 
