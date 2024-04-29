@@ -18,6 +18,7 @@
 
 static int ws_handshake(ws_connection_t *);
 static void build_accept_header(char *header, char *sec_websocket_key);
+static int ws_receive_frame(ws_connection_t *);
 
 static void *ws_server_listener_thread(void *);
 static void *ws_connection_thread(void *);
@@ -113,7 +114,7 @@ ws_server_listener_thread(void *param) {
 	return (void *) NULL;
 }
 
-static void*  
+static void*
 ws_connection_thread(void *connection) {
 	ws_connection_t *ws_connection = (ws_connection_t *) connection;
 
@@ -131,10 +132,73 @@ ws_connection_thread(void *connection) {
 	ws_connection->status = OPEN;
 	printf("congrats, connection is established\n");
 
-	ws_receive_packet();
+	for (;;) {
+		ws_receive_frame(ws_connection);
+	}
 
 	return (void *) NULL;
 }
+
+/*      0                   1                   2                   3
+      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     +-+-+-+-+-------+-+-------------+-------------------------------+
+     |F|R|R|R| opcode|M| Payload len |    Extended payload length    |
+     |I|S|S|S|  (4)  |A|     (7)     |             (16/64)           |
+     |N|V|V|V|       |S|             |   (if payload len==126/127)   |
+     | |1|2|3|       |K|             |                               |
+     +-+-+-+-+-------+-+-------------+ - - - - - - - - - - - - - - - +
+     |     Extended payload length continued, if payload len == 127  |
+     + - - - - - - - - - - - - - - - +-------------------------------+
+     |                               |Masking-key, if MASK set to 1  |
+     +-------------------------------+-------------------------------+
+     | Masking-key (continued)       |          Payload Data         |
+     +-------------------------------- - - - - - - - - - - - - - - - +
+     :                     Payload Data continued ...                :
+     + - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
+     |                     Payload Data continued ...                |
+     +---------------------------------------------------------------+
+*/
+
+static int
+ws_receive_frame(ws_connection_t *ws_connection) {
+	int numbytes;
+	uint8_t data[2048];
+	int packet_type, op_code, mask;
+	unsigned long payload_length;
+
+	numbytes = recv(ws_connection->fd, data, 2048, 0);
+	if(numbytes == -1) {
+		perror("socket recv");
+		return -1;
+	} else if (numbytes == 0) {
+		return -2;
+	}
+
+	packet_type = data[0] & 0xF0;
+	op_code = data[0] & 0x0F;
+	mask = data[1] & 0x80;
+
+	payload_length = data[1] & 0x7F;
+
+	if (payload_length == 126) {
+		payload_length = (long) data[2] << 8 | (long) data[3];
+	} else if (payload_length == 127) {
+		
+	}
+
+
+	return 0;
+}
+
+
+
+
+
+
+
+
+
+
 
 /**
  *  @brief          process the web socket handshake 
