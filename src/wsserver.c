@@ -18,7 +18,8 @@
 
 static int ws_handshake(ws_connection_t *);
 static void build_accept_header(char *header, char *sec_websocket_key);
-static int ws_receive_frame(ws_connection_t *);
+static int ws_receive_message(ws_connection_t *); 
+static int recv_bytes(int fd, uint8_t *mem, uint32_t fetch_bytes);
 
 static void *ws_server_listener_thread(void *);
 static void *ws_connection_thread(void *);
@@ -91,8 +92,6 @@ ws_server_listener_thread(void *param) {
 		connection->status = CONNECTING;
 		connection->remote_addr = remote_addr;
 
-
-
 		pthread_t new_thread;
 		rc = pthread_create(&new_thread, NULL, ws_connection_thread, (void *) connection);
 		if (rc != 0) {
@@ -133,7 +132,7 @@ ws_connection_thread(void *connection) {
 	printf("congrats, connection is established\n");
 
 	for (;;) {
-		ws_receive_frame(ws_connection);
+		ws_receive_message(ws_connection);
 	}
 
 	return (void *) NULL;
@@ -160,45 +159,106 @@ ws_connection_thread(void *connection) {
 */
 
 static int
-ws_receive_frame(ws_connection_t *ws_connection) {
-	int numbytes;
-	uint8_t data[2048];
-	int packet_type, op_code, mask;
+ws_receive_message(ws_connection_t *ws_connection) {
+	uint32_t fetched_bytes; 		// amount of fetched bytes
+	uint8_t frame_header[14], mask[4];
+	uint8_t fin, rsv, op_code, masked, payload_start, frame_type;
 	unsigned long payload_length;
 
-	numbytes = recv(ws_connection->fd, data, 2048, 0);
-	if(numbytes == -1) {
-		perror("socket recv");
-		return -1;
-	} else if (numbytes == 0) {
-		return -2;
+	fetched_bytes = 0;
+
+	// infinite loop for receiving all frames of a message
+	for (;;) {
+		int status = recv_bytes(ws_connection->fd, frame_header, 2);
+		// evaluate status value
+
+		fin = frame_header[0] & 0x80;
+		rsv = frame_header[0] & 0x70;
+		op_code = frame_header[0] & 0x0F;
+		masked = frame_header[1] & 0x80;
+
+		if (mask == 0) {
+			return -3; // server should reply with an error code indicating to close the connection 
+		}
+
+		payload_length = frame_header[1] & 0x7F;
+		payload_start = 6;
+
+		if (payload_length == 126) {
+			payload_start = 8;
+		} else if (payload_length == 127) {
+			payload_start = 14;
+		}
+
+		status = recv_bytes(ws_connection->fd, frame_header, payload_start - 2);
+		// evaluate status value
+
+		if (payload_length == 126) {
+			payload_length = (long) frame_header[2] << 8 | (long) frame_header[3];
+		} else if (payload_length == 127) {
+			payload_length = 0;
+			
+			for (int i = 0; i < 8; ++i) {
+				payload_length |= (long) frame_header[2 + i] << 8 * (7 - i);
+			}
+		}
+
+		if (payload_length > 0x00100000) {
+			// server should reply with an error code indicating to close the connection because frame size is bigger than 1 MB
+			return -3; 
+		}
+
+		// get Masking-Key
+		mask[0] = frame_header[payload_start - 4]; 
+		mask[1] = frame_header[payload_start - 3];
+		mask[2] = frame_header[payload_start - 2];
+		mask[3] = frame_header[payload_start - 1];
+
+		uint8_t frame_payload[payload_length];
+		status = recv_bytes(ws_connection->fd, frame_header, payload_length);
+		// evaluate status value
+
+		switch (op_code) {
+			case OPCODE_CONTINUATION: 
+				break;
+			case OPCODE_TEXT:
+				break;
+			case OPCODE_BINARY:			
+				break;
+			case OPCODE_CON_CLOSE:		
+				break;
+			case OPCODE_PING:
+				
+				break;
+			case OPCODE_PONG:
+				break;
+			default:
+				// send close frame	in order to fail the underlaying connection	
+				break;
+		}
 	}
-
-	packet_type = data[0] & 0xF0;
-	op_code = data[0] & 0x0F;
-	mask = data[1] & 0x80;
-
-	payload_length = data[1] & 0x7F;
-
-	if (payload_length == 126) {
-		payload_length = (long) data[2] << 8 | (long) data[3];
-	} else if (payload_length == 127) {
-		
-	}
-
 
 	return 0;
 }
 
+static int recv_bytes(int fd, uint8_t *mem, uint32_t fetch_bytes) {
+	uint32_t numbytes;
 
+	numbytes = 0;
+	while (fetch_bytes) {
+		numbytes = recv(fd, mem + numbytes, fetch_bytes, 0);
+		if(numbytes == -1) {
+			perror("socket recv");
+			return -1;
+		} else if (numbytes == 0) {
+			return -2;
+		}
 
+		fetch_bytes -= numbytes;
+	}
 
-
-
-
-
-
-
+	return 0;
+}
 
 /**
  *  @brief          process the web socket handshake 
