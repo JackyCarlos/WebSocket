@@ -19,6 +19,15 @@ enum ws_status {
 	CLOSED 		= 8
 };
 
+enum ws_op_code {
+	OPCODE_CONTINUATION = 0x00,
+	OPCODE_TEXT = 0x01,
+	OPCODE_BINARY = 0x02,
+	OPCODE_CON_CLOSE = 0x03,
+	OPCODE_PING = 0x08,
+	OPCODE_PONG = 0x0a
+};
+
 typedef struct {
 	uint32_t fd;
 	uint32_t status;
