@@ -160,12 +160,9 @@ ws_connection_thread(void *connection) {
 
 static int
 ws_receive_message(ws_connection_t *ws_connection) {
-	uint32_t fetched_bytes; 		// amount of fetched bytes
 	uint8_t frame_header[14], mask[4];
-	uint8_t fin, rsv, op_code, masked, payload_start, frame_type;
+	uint8_t fin, rsv, op_code, masked, payload_start;
 	unsigned long payload_length;
-
-	fetched_bytes = 0;
 
 	// infinite loop for receiving all frames of a message
 	for (;;) {
@@ -267,7 +264,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 }
 
 static int recv_bytes(int fd, uint8_t *mem, uint32_t fetch_bytes) {
-	uint32_t numbytes, temp;
+	uint32_t numbytes;
 
 	numbytes = 0;
 	while (fetch_bytes) {
