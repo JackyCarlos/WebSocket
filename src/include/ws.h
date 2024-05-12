@@ -48,3 +48,6 @@ ws_connection_t *accept_ws_connection(void);
 
 int send_ws_frame(ws_connection_t *, char *buf, int len);
 int receive_ws_frame(ws_connection_t *, char *buf, int len);
+
+// "user" space functions
+void on_message(ws_connection_t *); 
