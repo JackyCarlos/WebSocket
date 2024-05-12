@@ -166,9 +166,10 @@ ws_receive_message(ws_connection_t *ws_connection) {
 
 	// infinite loop for receiving all frames of a message
 	for (;;) {
-		int status = recv_bytes(ws_connection->fd, frame_header, 2);
-		printf("status recv bytes: %d\n", status);
-		// evaluate status value
+		// evaluate status
+		if (recv_bytes(ws_connection->fd, frame_header, 2) < 0) {
+			return -3; // server should reply with an error code indicating to close the connection 
+		}
 
 		fin = frame_header[0] & 0x80;
 		rsv = frame_header[0] & 0x70;
@@ -176,7 +177,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		masked = frame_header[1] & 0x80;
 
 		if (masked == 0) {
-			return -3; // server should reply with an error code indicating to close the connection 
+			return -3; 
 		}
 
 		payload_length = frame_header[1] & 0x7F;
@@ -188,9 +189,11 @@ ws_receive_message(ws_connection_t *ws_connection) {
 			payload_start = 14;
 		}
 
-		status = recv_bytes(ws_connection->fd, frame_header + 2, payload_start - 2);
-		printf("status recv bytes: %d\n", status);
 		// evaluate status value
+		if (recv_bytes(ws_connection->fd, frame_header + 2, payload_start - 2) < 0) {
+			return -3; 
+		}
+		
 
 		if (payload_length == 126) {
 			payload_length = (long) frame_header[2] << 8 | (long) frame_header[3];
@@ -214,10 +217,11 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		mask[3] = frame_header[payload_start - 1];
 
 		uint8_t frame_payload[payload_length + 1];
-		status = recv_bytes(ws_connection->fd, frame_payload, payload_length);
-		printf("status recv bytes: %d\n", status);
-		// evaluate status value 
 
+		// evaluate status value
+		if (recv_bytes(ws_connection->fd, frame_payload, payload_length) < 0) {
+			return -3;
+		}
 
 		frame_payload[payload_length] = '\0';
 
