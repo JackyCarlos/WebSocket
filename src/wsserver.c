@@ -138,6 +138,7 @@ ws_connection_thread(void *connection) {
 			on_message(ws_connection);
 		}
 
+		free(ws_connection->message);
 	}
 
 	return (void *) NULL;
@@ -202,7 +203,6 @@ ws_receive_message(ws_connection_t *ws_connection) {
 			return -3; 
 		}
 		
-
 		if (payload_length == 126) {
 			payload_length = (long) frame_header[2] << 8 | (long) frame_header[3];
 		} else if (payload_length == 127) {
@@ -252,11 +252,12 @@ ws_receive_message(ws_connection_t *ws_connection) {
 				printf("2");	
 				break;
 			case OPCODE_CON_CLOSE:
-				printf("3");		
+				printf("3");
+				// do a clean up of the connection		
 				break;
 			case OPCODE_PING:
 				printf("4");
-				// send pong
+				// send pong frame
 				break;
 			case OPCODE_PONG:
 				printf("5");
@@ -267,7 +268,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 				break;
 		}
 
-		printf("payload data: %s\n", (char *) ws_connection->message);
+		//printf("payload data: %s\n", (char *) ws_connection->message);
 
 		if (fin) {
 			break;
