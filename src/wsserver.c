@@ -131,8 +131,13 @@ ws_connection_thread(void *connection) {
 	ws_connection->status = OPEN;
 	printf("congrats, connection is established\n");
 
+	int val;
 	for (;;) {
-		ws_receive_message(ws_connection);
+		val = ws_receive_message(ws_connection);
+		if (val == 0) {
+			on_message(ws_connection);
+		}
+
 	}
 
 	return (void *) NULL;
@@ -163,7 +168,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 	uint8_t frame_header[14], mask[4];
 	uint8_t fin, rsv, op_code, masked, payload_start;
 	unsigned long payload_length;
-	int continuation;
+	int continuation_frame;
 
 	continuation_frame = 0;
 
@@ -219,18 +224,21 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		mask[2] = frame_header[payload_start - 2];
 		mask[3] = frame_header[payload_start - 1];
 
-		uint8_t frame_payload[payload_length + 1];
+		if (continuation_frame == 0) {
+			ws_connection->message = (uint8_t *) malloc(payload_length + 1);
+			ws_connection->message_length = payload_length;
+		}
 
 		// evaluate status value
-		if (recv_bytes(ws_connection->fd, frame_payload, payload_length) < 0) {
+		if (recv_bytes(ws_connection->fd, ws_connection->message, payload_length) < 0) {
 			return -3;
 		}
 
-		frame_payload[payload_length] = '\0';
+		ws_connection->message[payload_length] = '\0';
 
 		// unmask
 		for (int i = 0; i < payload_length; ++i) {
-			frame_payload[i] ^= mask[i % 4];
+			ws_connection->message[i] ^= mask[i % 4];
 		}
 
 		switch (op_code) {
@@ -259,9 +267,13 @@ ws_receive_message(ws_connection_t *ws_connection) {
 				break;
 		}
 
-		printf("payload data: %s\n", (char *) frame_payload);
+		printf("payload data: %s\n", (char *) ws_connection->message);
 
-		(fin) ? break : continuation_frame = 1;
+		if (fin) {
+			break;
+		} else {
+			continuation_frame = 1;
+		}
 	}
 
 	return 0;
