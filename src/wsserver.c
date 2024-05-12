@@ -170,6 +170,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 	// infinite loop for receiving all frames of a message
 	for (;;) {
 		int status = recv_bytes(ws_connection->fd, frame_header, 2);
+		printf("status recv bytes: %d\n", status);
 		// evaluate status value
 
 		fin = frame_header[0] & 0x80;
@@ -177,7 +178,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		op_code = frame_header[0] & 0x0F;
 		masked = frame_header[1] & 0x80;
 
-		if (mask == 0) {
+		if (masked == 0) {
 			return -3; // server should reply with an error code indicating to close the connection 
 		}
 
@@ -190,7 +191,8 @@ ws_receive_message(ws_connection_t *ws_connection) {
 			payload_start = 14;
 		}
 
-		status = recv_bytes(ws_connection->fd, frame_header, payload_start - 2);
+		status = recv_bytes(ws_connection->fd, frame_header + 2, payload_start - 2);
+		printf("status recv bytes: %d\n", status);
 		// evaluate status value
 
 		if (payload_length == 126) {
@@ -214,27 +216,50 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		mask[2] = frame_header[payload_start - 2];
 		mask[3] = frame_header[payload_start - 1];
 
-		uint8_t frame_payload[payload_length];
-		status = recv_bytes(ws_connection->fd, frame_header, payload_length);
-		// evaluate status value
+		uint8_t frame_payload[payload_length + 1];
+		status = recv_bytes(ws_connection->fd, frame_payload, payload_length);
+		printf("status recv bytes: %d\n", status);
+		// evaluate status value 
+
+
+		frame_payload[payload_length] = '\0';
+
+		// unmask
+		for (int i = 0; i < payload_length; ++i) {
+			frame_payload[i] ^= mask[i % 4];
+		}
 
 		switch (op_code) {
 			case OPCODE_CONTINUATION: 
+				printf("0");
 				break;
 			case OPCODE_TEXT:
+				printf("1");
 				break;
-			case OPCODE_BINARY:			
+			case OPCODE_BINARY:
+				printf("2");	
 				break;
-			case OPCODE_CON_CLOSE:		
+			case OPCODE_CON_CLOSE:
+				printf("3");		
 				break;
 			case OPCODE_PING:
-				
+				printf("4");
+				// send pong
 				break;
 			case OPCODE_PONG:
+				printf("5");
 				break;
 			default:
 				// send close frame	in order to fail the underlaying connection	
+				printf("6");
 				break;
+		}
+
+		printf("payload data: %s\n", (char *) frame_payload);
+		exit(1);
+
+		if (fin) {
+			break;
 		}
 	}
 
@@ -242,11 +267,12 @@ ws_receive_message(ws_connection_t *ws_connection) {
 }
 
 static int recv_bytes(int fd, uint8_t *mem, uint32_t fetch_bytes) {
-	uint32_t numbytes;
+	uint32_t numbytes, temp;
 
 	numbytes = 0;
 	while (fetch_bytes) {
-		numbytes = recv(fd, mem + numbytes, fetch_bytes, 0);
+		numbytes = recv(fd, mem, fetch_bytes, 0);
+		
 		if(numbytes == -1) {
 			perror("socket recv");
 			return -1;
@@ -254,6 +280,7 @@ static int recv_bytes(int fd, uint8_t *mem, uint32_t fetch_bytes) {
 			return -2;
 		}
 
+		mem += numbytes;
 		fetch_bytes -= numbytes;
 	}
 
