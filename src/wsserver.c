@@ -163,6 +163,9 @@ ws_receive_message(ws_connection_t *ws_connection) {
 	uint8_t frame_header[14], mask[4];
 	uint8_t fin, rsv, op_code, masked, payload_start;
 	unsigned long payload_length;
+	int continuation;
+
+	continuation_frame = 0;
 
 	// infinite loop for receiving all frames of a message
 	for (;;) {
@@ -176,7 +179,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		op_code = frame_header[0] & 0x0F;
 		masked = frame_header[1] & 0x80;
 
-		if (masked == 0) {
+		if (masked == 0 || continuation_frame == 1 && op_code != 0) {
 			return -3; 
 		}
 
@@ -257,11 +260,8 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		}
 
 		printf("payload data: %s\n", (char *) frame_payload);
-		exit(1);
 
-		if (fin) {
-			break;
-		}
+		(fin) ? break : continuation_frame = 1;
 	}
 
 	return 0;
