@@ -46,8 +46,7 @@ typedef struct {
 int ws_server(char *host_address, char *port);
 ws_connection_t *accept_ws_connection(void);
 
-int send_ws_frame(ws_connection_t *, char *buf, int len);
-int receive_ws_frame(ws_connection_t *, char *buf, int len);
-
 // "user" space functions
 void on_message(ws_connection_t *); 
+int send_ws_message(ws_connection_t *, uint8_t *bytes, uint32_t length);
+
