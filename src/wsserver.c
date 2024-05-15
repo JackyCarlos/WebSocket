@@ -68,6 +68,10 @@ ws_server(char *host_address, char *port) {
 	return 0;
 }
 
+int send_ws_frame(ws_connection_t *connection, uint8_t *bytes, uint32_t length) {
+
+}
+
 static void*
 ws_server_listener_thread(void *param) {
 	int newfd, rc;
@@ -278,6 +282,10 @@ ws_receive_message(ws_connection_t *ws_connection) {
 	}
 
 	return 0;
+}
+
+static int ws_send_message(ws_connection_t *connection, uint8_t *bytes, uint32_t length) {
+	
 }
 
 static int recv_bytes(int fd, uint8_t *mem, uint32_t fetch_bytes) {
