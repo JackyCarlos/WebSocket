@@ -129,14 +129,13 @@ ws_connection_thread(void *connection) {
 	}
 
 	ws_connection->status = OPEN;
-	printf("congrats, connection is established\n");
 
 	int val;
 	for (;;) {
 		val = ws_receive_message(ws_connection);
 		if (val == 0) {
 			on_message(ws_connection);
-		}
+		} else if () 
 
 		free(ws_connection->message);
 	}
@@ -168,10 +167,12 @@ static int
 ws_receive_message(ws_connection_t *ws_connection) {
 	uint8_t frame_header[14], mask[4];
 	uint8_t fin, rsv, op_code, masked, payload_start;
+	uint32_t message_length;
 	unsigned long payload_length;
 	int continuation_frame;
 
 	continuation_frame = 0;
+	ws_connection->message_length = 0;
 
 	// infinite loop for receiving all frames of a message
 	for (;;) {
@@ -218,23 +219,24 @@ ws_receive_message(ws_connection_t *ws_connection) {
 			return -3; 
 		}
 
+		if (continuation_frame == 0) {
+			ws_connection->message = (uint8_t *) malloc(payload_length);
+		} else {
+			ws_connection->message = (uint8_t *) realloc(ws_connection->message, ws_connection->message_length + payload_length);
+		}
+	
+		// evaluate status value
+		if (recv_bytes(ws_connection->fd, ws_connection->message + ws_connection->message_length, payload_length) < 0) {
+			return -3;
+		}
+
+		ws_connection->message_length += payload_length;
+
 		// get Masking-Key
 		mask[0] = frame_header[payload_start - 4]; 
 		mask[1] = frame_header[payload_start - 3];
 		mask[2] = frame_header[payload_start - 2];
 		mask[3] = frame_header[payload_start - 1];
-
-		if (continuation_frame == 0) {
-			ws_connection->message = (uint8_t *) malloc(payload_length + 1);
-			ws_connection->message_length = payload_length;
-		}
-
-		// evaluate status value
-		if (recv_bytes(ws_connection->fd, ws_connection->message, payload_length) < 0) {
-			return -3;
-		}
-
-		ws_connection->message[payload_length] = '\0';
 
 		// unmask
 		for (int i = 0; i < payload_length; ++i) {
@@ -267,8 +269,6 @@ ws_receive_message(ws_connection_t *ws_connection) {
 				printf("6");
 				break;
 		}
-
-		//printf("payload data: %s\n", (char *) ws_connection->message);
 
 		if (fin) {
 			break;
