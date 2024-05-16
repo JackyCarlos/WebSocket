@@ -32,7 +32,7 @@ typedef struct {
 	uint32_t fd;
 	uint32_t status;
 	struct sockaddr_storage remote_addr;
-	pthread_t thread;
+	uint8_t thread_id;
 
 	uint8_t *message;
 	uint32_t message_length;
