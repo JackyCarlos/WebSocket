@@ -20,9 +20,11 @@ static int ws_handshake(ws_connection_t *);
 static void build_accept_header(char *header, char *sec_websocket_key);
 static int ws_receive_message(ws_connection_t *); 
 static int recv_bytes(int fd, uint8_t *mem, uint32_t fetch_bytes);
+static void init_connections(int);
 
 static void *ws_server_listener_thread(void *);
 static void *ws_connection_thread(void *);
+static void thread_cleanup_handler(void *);
 
 static ws_connection_t **connections;
 static int listening_fd;
@@ -58,6 +60,7 @@ ws_server(char *host_address, char *port) {
 	if (connections == NULL) {
 		return -1;
 	}
+	init_connections(0);
 
 	rc = pthread_create(&listener_thread, NULL, ws_server_listener_thread, NULL);
 	if (rc != 0) {
@@ -69,18 +72,21 @@ ws_server(char *host_address, char *port) {
 }
 
 int send_ws_frame(ws_connection_t *connection, uint8_t *bytes, uint32_t length) {
-
+	return 0;
 }
 
 static void*
 ws_server_listener_thread(void *param) {
 	int newfd, rc;
+	uint32_t thread_pos;
 	socklen_t addrlen;
 	struct sockaddr_storage remote_addr;
 	ws_connection_t *connection;
 	addrlen = sizeof(struct sockaddr_storage);
 
 	for (;;) {
+		thread_pos = 0;
+
 		newfd = accept(listening_fd, (struct sockaddr *) &remote_addr, &addrlen);
 		if (newfd == -1) {
 			perror("accept error");
@@ -99,19 +105,26 @@ ws_server_listener_thread(void *param) {
 		pthread_t new_thread;
 		rc = pthread_create(&new_thread, NULL, ws_connection_thread, (void *) connection);
 		if (rc != 0) {
+			free(connection);
 			perror("thread create error");
 			continue;
+		}		
+
+		for (; thread_pos < max_con; ++thread_pos) {
+			if (connections[thread_pos] == NULL) {
+				break;
+			}
 		}
 
-		connection->thread = new_thread;
-		printf("DEBUG\n");
-		fflush(stdout);
-		connections[con_count++] = connection;
-
-		if(con_count == max_con) {
+		if (thread_pos == max_con) {
 			max_con += 10;
 			connections = realloc(connections, sizeof(ws_connection_t *) * max_con);
+			init_connections(thread_pos);
 		}
+
+		connection->thread_id = thread_pos;
+
+		connections[thread_pos] = connection;
 	}
 
 	return (void *) NULL;
@@ -119,15 +132,16 @@ ws_server_listener_thread(void *param) {
 
 static void*
 ws_connection_thread(void *connection) {
-	ws_connection_t *ws_connection = (ws_connection_t *) connection;
+	pthread_cleanup_push(thread_cleanup_handler, connection);
 
+	ws_connection_t *ws_connection = (ws_connection_t *) connection;
 	int status;
+
 	status = -1;
 	
 	while (status != 0) {
 		status = ws_handshake(connection);
 		if (status == -2) {
-			// TODO: tidy up the connection
 			pthread_exit(NULL);
 		}
 	}
@@ -139,10 +153,12 @@ ws_connection_thread(void *connection) {
 		val = ws_receive_message(ws_connection);
 		if (val == 0) {
 			on_message(ws_connection);
-		} else if () 
+		} 
 
-		free(ws_connection->message);
+
 	}
+
+	pthread_cleanup_pop(1);
 
 	return (void *) NULL;
 }
@@ -171,7 +187,6 @@ static int
 ws_receive_message(ws_connection_t *ws_connection) {
 	uint8_t frame_header[14], mask[4];
 	uint8_t fin, rsv, op_code, masked, payload_start;
-	uint32_t message_length;
 	unsigned long payload_length;
 	int continuation_frame;
 
@@ -190,7 +205,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		op_code = frame_header[0] & 0x0F;
 		masked = frame_header[1] & 0x80;
 
-		if (masked == 0 || continuation_frame == 1 && op_code != 0) {
+		if (masked == 0 || (continuation_frame == 1 && op_code != 0)) {
 			return -3; 
 		}
 
@@ -284,11 +299,13 @@ ws_receive_message(ws_connection_t *ws_connection) {
 	return 0;
 }
 
-static int ws_send_message(ws_connection_t *connection, uint8_t *bytes, uint32_t length) {
-	
+static int 
+ws_send_message(ws_connection_t *connection, uint8_t *bytes, uint32_t length) {
+	return 0;
 }
 
-static int recv_bytes(int fd, uint8_t *mem, uint32_t fetch_bytes) {
+static int 
+recv_bytes(int fd, uint8_t *mem, uint32_t fetch_bytes) {
 	uint32_t numbytes;
 
 	numbytes = 0;
@@ -424,4 +441,19 @@ static void build_accept_header(char *accept_header, char *sec_websocket_key) {
 	sha1_output(hash_bytes, &context);
 
 	base64_encode(hash_bytes, 20, accept_header, &len);
+}
+
+
+static void init_connections(int start_pos) {
+	for (int i = start_pos; i < max_con; ++i) {
+		connections[i] = NULL;
+	}
+}
+
+static void thread_cleanup_handler(void *arg) {
+	ws_connection_t *connection = (ws_connection_t *) arg;
+
+	connections[connection->thread_id] = NULL;
+	free(connection->message);
+	free(connection);
 }
