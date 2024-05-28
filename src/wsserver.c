@@ -71,6 +71,7 @@ ws_server(char *host_address, char *port) {
 	return 0;
 }
 
+// user function
 int send_ws_frame(ws_connection_t *connection, uint8_t *bytes, uint32_t length) {
 	return 0;
 }
@@ -300,7 +301,44 @@ ws_receive_message(ws_connection_t *ws_connection) {
 }
 
 static int 
-ws_send_message(ws_connection_t *connection, uint8_t *bytes, uint32_t length) {
+ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type) {
+	int frames; // amount of frames to send
+	uint64_t frame_len;
+	ws_frame_t frame;
+	uint8_t frame_header[10];
+
+	frames = message_length / MAX_FRAME_SIZE;
+	frames += (message_length % MAX_FRAME_SIZE == 0) ? 0 : 1;
+	frame_header_len = 2; 
+
+	frame.extended_payload_len = 0;
+
+	for (int i = 0; i < frames; ++i) {
+		frame.fin = (message_length <= MAX_FRAME_SIZE) ? 1 : 0;
+		frame.opcode = (i == 0) ? message_type : 0x00; 
+
+		if (message_length < 126) {
+			frame.payload_len = message_length;
+		} else if (message_length < 0xffff) {
+			frame.payload_len = 126;
+			frame.extended_payload_len = message_length;
+			frame_len += 2;
+		} else {
+			frame.payload_len = 127;
+			frame_len += 8;
+			frame.extended_payload_len = (message_length <= MAX_FRAME_SIZE) ? message_length : MAX_FRAME_SIZE;
+		}
+
+		// build ws frame header 
+		// send_bytes(header);
+		// send_bytes(message);		
+		
+
+
+		message_bytes += MAX_FRAME_SIZE;
+		message_length -= MAX_FRAME_SIZE;
+	}
+
 	return 0;
 }
 
