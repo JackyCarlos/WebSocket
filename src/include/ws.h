@@ -9,8 +9,9 @@
 #include <stdint.h>
 #include <pthread.h>
 
-#define 	MAX_CON 	10
-#define 	GUID		"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+#define 	MAX_CON 		10
+#define 	GUID			"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+#define 	MAX_FRAME_SIZE	0x00100000
 
 enum ws_status {
 	CONNECTING 	= 1,
@@ -21,11 +22,11 @@ enum ws_status {
 
 enum ws_op_code {
 	OPCODE_CONTINUATION = 0x00,
-	OPCODE_TEXT = 0x01,
-	OPCODE_BINARY = 0x02,
-	OPCODE_CON_CLOSE = 0x03,
-	OPCODE_PING = 0x08,
-	OPCODE_PONG = 0x0a
+	OPCODE_TEXT 		= 0x01,
+	OPCODE_BINARY 		= 0x02,
+	OPCODE_CON_CLOSE 	= 0x03,
+	OPCODE_PING 		= 0x08,
+	OPCODE_PONG 		= 0x0a
 };
 
 typedef struct {
@@ -40,8 +41,11 @@ typedef struct {
 } ws_connection_t;
 
 typedef struct {
-	
-} ws_packet_t;
+	uint8_t fin;
+	uint8_t opcode;
+	uint8_t payload_len;
+	uint64_t extended_payload_len;
+} ws_frame_t;
 
 int ws_server(char *host_address, char *port);
 ws_connection_t *accept_ws_connection(void);
@@ -49,4 +53,3 @@ ws_connection_t *accept_ws_connection(void);
 // "user" space functions
 void on_message(ws_connection_t *); 
 int send_ws_message(ws_connection_t *, uint8_t *bytes, uint32_t length);
-
