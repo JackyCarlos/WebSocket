@@ -19,7 +19,6 @@
 static int ws_handshake(ws_connection_t *);
 static void build_accept_header(char *header, char *sec_websocket_key);
 static int ws_receive_message(ws_connection_t *); 
-static int recv_bytes(int fd, uint8_t *mem, uint32_t fetch_bytes);
 static void init_connections(int);
 
 static void *ws_server_listener_thread(void *);
@@ -361,36 +360,7 @@ int send_ws_message_bin(ws_connection_t *connection, uint8_t *bytes, uint32_t le
 // 	return 0;
 // }
 
-/**
- *  @brief                  receive bytes from a socket
- *
- *  @param fd               the file descriptor   
- *  @param mem              pointer to the memory region to store the received bytes 
- *  @param fetch_bytes      amount of bytes to fetch 
- *  @return                 0 if successful, or -1 in case the opposing site closed the underlying tcp connection, -2 any other error occured
- * 
- */                                                            
-static int 
-recv_bytes(int fd, uint8_t *mem, uint32_t fetch_bytes) {
-	uint32_t numbytes;
 
-	numbytes = 0;
-	while (fetch_bytes) {
-		numbytes = recv(fd, mem, fetch_bytes, 0);
-		
-		if(numbytes == 0) {
-			return -1;
-		} else if (numbytes == -1) {
-			perror("socket recv");
-			return -2;
-		}
-
-		mem += numbytes;
-		fetch_bytes -= numbytes;
-	}
-
-	return 0;
-}
 
 /**
  *  @brief          process the web socket handshake 
