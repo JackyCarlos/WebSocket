@@ -68,11 +68,8 @@ ws_server(char *host_address, char *port) {
 		return -1;
 	}
 
-	return 0;
-}
+	printf("websocket server created. Listening on %s:%s\n", host_address, port);
 
-// user function
-int send_ws_frame(ws_connection_t *connection, uint8_t *bytes, uint32_t length) {
 	return 0;
 }
 
@@ -126,6 +123,7 @@ ws_server_listener_thread(void *param) {
 		connection->thread_id = thread_pos;
 
 		connections[thread_pos] = connection;
+		con_count++;
 	}
 
 	return (void *) NULL;
@@ -146,6 +144,8 @@ ws_connection_thread(void *connection) {
 			pthread_exit(NULL);
 		}
 	}
+
+	on_connection(connection);
 
 	ws_connection->status = OPEN;
 
@@ -184,6 +184,15 @@ ws_connection_thread(void *connection) {
      +---------------------------------------------------------------+
 */
 
+
+/**
+ *  @brief                  receive a websocket message
+ *
+ *  @param ws_connection    ws_connection_t instance representing an open websocket connection 
+ *  @return                 0 if successful, -1 if the underlying socket got closed or an 
+ *                          	other error occured, -2 if the client sent an unmasked frame,
+ *                          	-3 if the client sent a message bigger than 1 MB                                                      
+ */
 static int
 ws_receive_message(ws_connection_t *ws_connection) {
 	uint8_t frame_header[14], mask[4];
@@ -198,7 +207,8 @@ ws_receive_message(ws_connection_t *ws_connection) {
 	for (;;) {
 		// evaluate status
 		if (recv_bytes(ws_connection->fd, frame_header, 2) < 0) {
-			return -3; // server should reply with an error code indicating to close the connection 
+			// error receiving bytes from the socket, clean up the connection
+			return -1; 
 		}
 
 		fin = frame_header[0] & 0x80;
@@ -207,7 +217,8 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		masked = frame_header[1] & 0x80;
 
 		if (masked == 0 || (continuation_frame == 1 && op_code != 0)) {
-			return -3; 
+			// client sent an unmasked frame. consequence unknown
+			return -2; 
 		}
 
 		payload_length = frame_header[1] & 0x7F;
@@ -219,9 +230,9 @@ ws_receive_message(ws_connection_t *ws_connection) {
 			payload_start = 14;
 		}
 
-		// evaluate status value
 		if (recv_bytes(ws_connection->fd, frame_header + 2, payload_start - 2) < 0) {
-			return -3; 
+			// error receiving bytes from the socket, clean up the connection
+			return -1; 
 		}
 		
 		if (payload_length == 126) {
@@ -245,9 +256,9 @@ ws_receive_message(ws_connection_t *ws_connection) {
 			ws_connection->message = (uint8_t *) realloc(ws_connection->message, ws_connection->message_length + payload_length);
 		}
 	
-		// evaluate status value
 		if (recv_bytes(ws_connection->fd, ws_connection->message + ws_connection->message_length, payload_length) < 0) {
-			return -3;
+			// error receiving bytes from the socket, clean up the connection
+			return -1; 
 		}
 
 		ws_connection->message_length += payload_length;
@@ -300,48 +311,65 @@ ws_receive_message(ws_connection_t *ws_connection) {
 	return 0;
 }
 
-static int 
-ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type) {
-	int frames; // amount of frames to send
-	uint64_t frame_len;
-	ws_frame_t frame;
-	uint8_t frame_header[10];
-
-	frames = message_length / MAX_FRAME_SIZE;
-	frames += (message_length % MAX_FRAME_SIZE == 0) ? 0 : 1;
-	frame_header_len = 2; 
-
-	frame.extended_payload_len = 0;
-
-	for (int i = 0; i < frames; ++i) {
-		frame.fin = (message_length <= MAX_FRAME_SIZE) ? 1 : 0;
-		frame.opcode = (i == 0) ? message_type : 0x00; 
-
-		if (message_length < 126) {
-			frame.payload_len = message_length;
-		} else if (message_length < 0xffff) {
-			frame.payload_len = 126;
-			frame.extended_payload_len = message_length;
-			frame_len += 2;
-		} else {
-			frame.payload_len = 127;
-			frame_len += 8;
-			frame.extended_payload_len = (message_length <= MAX_FRAME_SIZE) ? message_length : MAX_FRAME_SIZE;
-		}
-
-		// build ws frame header 
-		// send_bytes(header);
-		// send_bytes(message);		
-		
-
-
-		message_bytes += MAX_FRAME_SIZE;
-		message_length -= MAX_FRAME_SIZE;
-	}
-
+int send_ws_message_txt(ws_connection_t *connection, uint8_t *bytes, uint32_t length) {
 	return 0;
 }
 
+int send_ws_message_bin(ws_connection_t *connection, uint8_t *bytes, uint32_t length) {
+	return 0;
+}
+
+// static int 
+// ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type) {
+// 	int frames; // amount of frames to send
+// 	uint64_t frame_len;
+// 	ws_frame_t frame;
+// 	uint8_t frame_header[10];
+
+// 	frames = message_length / MAX_FRAME_SIZE;
+// 	frames += (message_length % MAX_FRAME_SIZE == 0) ? 0 : 1;
+// 	frame_header_len = 2; 
+
+// 	frame.extended_payload_len = 0;
+
+// 	for (int i = 0; i < frames; ++i) {
+// 		frame.fin = (message_length <= MAX_FRAME_SIZE) ? 1 : 0;
+// 		frame.opcode = (i == 0) ? message_type : 0x00; 
+
+// 		if (message_length < 126) {
+// 			frame.payload_len = message_length;
+// 		} else if (message_length < 0xffff) {
+// 			frame.payload_len = 126;
+// 			frame.extended_payload_len = message_length;
+// 			frame_len += 2;
+// 		} else {
+// 			frame.payload_len = 127;
+// 			frame_len += 8;
+// 			frame.extended_payload_len = (message_length <= MAX_FRAME_SIZE) ? message_length : MAX_FRAME_SIZE;
+// 		}
+
+// 		// build ws frame header 
+// 		// send_bytes(header);
+// 		// send_bytes(message);		
+		
+
+
+// 		message_bytes += MAX_FRAME_SIZE;
+// 		message_length -= MAX_FRAME_SIZE;
+// 	}
+
+// 	return 0;
+// }
+
+/**
+ *  @brief                  receive bytes from a socket
+ *
+ *  @param fd               the file descriptor   
+ *  @param mem              pointer to the memory region to store the received bytes 
+ *  @param fetch_bytes      amount of bytes to fetch 
+ *  @return                 0 if successful, or -1 in case the opposing site closed the underlying tcp connection, -2 any other error occured
+ * 
+ */                                                            
 static int 
 recv_bytes(int fd, uint8_t *mem, uint32_t fetch_bytes) {
 	uint32_t numbytes;
@@ -350,10 +378,10 @@ recv_bytes(int fd, uint8_t *mem, uint32_t fetch_bytes) {
 	while (fetch_bytes) {
 		numbytes = recv(fd, mem, fetch_bytes, 0);
 		
-		if(numbytes == -1) {
-			perror("socket recv");
+		if(numbytes == 0) {
 			return -1;
-		} else if (numbytes == 0) {
+		} else if (numbytes == -1) {
+			perror("socket recv");
 			return -2;
 		}
 
