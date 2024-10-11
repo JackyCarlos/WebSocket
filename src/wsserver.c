@@ -315,14 +315,21 @@ ws_receive_message(ws_connection_t *ws_connection) {
 	return 0;
 }
 
-int send_ws_message_txt(ws_connection_t *connection, uint8_t *bytes, uint64_t length) {
-	return ws_send_message(connection, bytes, length, 1);
+int 
+send_ws_message_txt(ws_connection_t *connection, uint8_t *bytes, uint64_t length) {
+	return ws_send_message(connection, bytes, length, OPCODE_TEXT);
 }
 
-int send_ws_message_bin(ws_connection_t *connection, uint8_t *bytes, uint64_t length) {
-	return ws_send_message(connection, bytes, length, 2);
+int 
+send_ws_message_bin(ws_connection_t *connection, uint8_t *bytes, uint64_t length) {
+	return ws_send_message(connection, bytes, length, OPCODE_BINARY);
 }
 
+/**
+ *  @brief                  send ws message
+ *
+ *                                                    
+ */
 static int 
 ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type) {
 	int frames; // amount of frames to send
@@ -376,8 +383,6 @@ ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t me
 
 	return 0;
 }
-
-
 
 /**
  *  @brief          process the web socket handshake 
