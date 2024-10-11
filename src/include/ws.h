@@ -46,5 +46,5 @@ ws_connection_t *accept_ws_connection(void);
 // "user" space functions
 void on_message(ws_connection_t *);
 void on_connection(ws_connection_t *);
-int send_ws_message_txt(ws_connection_t *, uint8_t *bytes, uint32_t length);
-int send_ws_message_bin(ws_connection_t *, uint8_t *bytes, uint32_t length);
+int send_ws_message_txt(ws_connection_t *, uint8_t *bytes, uint64_t length);
+int send_ws_message_bin(ws_connection_t *, uint8_t *bytes, uint64_t length);
