@@ -40,12 +40,6 @@ typedef struct {
 	uint8_t message_type;
 } ws_connection_t;
 
-typedef struct {
-	uint8_t fin_opcode;
-	uint8_t payload_len;
-	uint64_t extended_payload_len;
-} ws_frame_header_t;
-
 int ws_server(char *host_address, char *port);
 ws_connection_t *accept_ws_connection(void);
 
