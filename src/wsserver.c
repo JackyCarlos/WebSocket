@@ -20,6 +20,7 @@ static int ws_handshake(ws_connection_t *);
 static void build_accept_header(char *header, char *sec_websocket_key);
 static int ws_receive_message(ws_connection_t *); 
 static void init_connections(int);
+static int ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type);
 
 static void *ws_server_listener_thread(void *);
 static void *ws_connection_thread(void *);
@@ -222,7 +223,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		if (masked == 0 || (continuation_frame == 1 && op_code != 0)) {
 			// client sent an unmasked frame. consequence unknown
 			return -2; 
-		}
+		} 
 
 		payload_length = frame_header[1] & 0x7F;
 		payload_start = 6;
@@ -314,12 +315,12 @@ ws_receive_message(ws_connection_t *ws_connection) {
 	return 0;
 }
 
-int send_ws_message_txt(ws_connection_t *connection, uint8_t *bytes, uint32_t length) {
-	return 0;
+int send_ws_message_txt(ws_connection_t *connection, uint8_t *bytes, uint64_t length) {
+	return ws_send_message(connection, bytes, length, 1);
 }
 
-int send_ws_message_bin(ws_connection_t *connection, uint8_t *bytes, uint32_t length) {
-	return 0;
+int send_ws_message_bin(ws_connection_t *connection, uint8_t *bytes, uint64_t length) {
+	return ws_send_message(connection, bytes, length, 2);
 }
 
 static int 
