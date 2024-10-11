@@ -20,6 +20,7 @@ static int ws_handshake(ws_connection_t *);
 static void build_accept_header(char *header, char *sec_websocket_key);
 static int ws_receive_message(ws_connection_t *); 
 static void init_connections(int);
+static void build_ws_frame_header(uint8_t *frame_header, ws_frame_t *);
 
 static void *ws_server_listener_thread(void *);
 static void *ws_connection_thread(void *);
@@ -102,13 +103,14 @@ ws_server_listener_thread(void *param) {
 		pthread_t new_thread;
 		rc = pthread_create(&new_thread, NULL, ws_connection_thread, (void *) connection);
 		if (rc != 0) {
+			// change connection state
 			free(connection);
 			perror("thread create error");
 			continue;
 		}		
 
 		for (; thread_pos < max_con; ++thread_pos) {
-			if (connections[thread_pos] == NULL) {
+			if (connections[thread_pos] == NULL || connections[thread_pos]->status == CLOSED) {
 				break;
 			}
 		}
@@ -215,6 +217,9 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		op_code = frame_header[0] & 0x0F;
 		masked = frame_header[1] & 0x80;
 
+		// An unfragmented message consists of a single frame with the FIN
+        // bit set (Section 5.2) and an opcode other than 0.
+
 		if (masked == 0 || (continuation_frame == 1 && op_code != 0)) {
 			// client sent an unmasked frame. consequence unknown
 			return -2; 
@@ -318,47 +323,59 @@ int send_ws_message_bin(ws_connection_t *connection, uint8_t *bytes, uint32_t le
 	return 0;
 }
 
-// static int 
-// ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type) {
-// 	int frames; // amount of frames to send
-// 	uint64_t frame_len;
-// 	ws_frame_t frame;
-// 	uint8_t frame_header[10];
+static int 
+ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type) {
+	int frames; // amount of frames to send
+	int header_len; 
+	uint8_t frame_header[10];
+	uint64_t payload_len;
 
-// 	frames = message_length / MAX_FRAME_SIZE;
-// 	frames += (message_length % MAX_FRAME_SIZE == 0) ? 0 : 1;
-// 	frame_header_len = 2; 
+	frames = message_length / MAX_FRAME_SIZE;
+	frames += (message_length % MAX_FRAME_SIZE == 0) ? 0 : 1;
+	header_len = 2; 
 
-// 	frame.extended_payload_len = 0;
+	for (int i = 0; i < frames; ++i) {
+		// start packing
+		frame_header[0] = (message_length <= MAX_FRAME_SIZE) ? 0x80 : 0;
+		frame_header[0] |= (i == 0) ? message_type : 0x00;
 
-// 	for (int i = 0; i < frames; ++i) {
-// 		frame.fin = (message_length <= MAX_FRAME_SIZE) ? 1 : 0;
-// 		frame.opcode = (i == 0) ? message_type : 0x00; 
+		if (message_length < 126) {
+			frame_header[1] = message_length;
+			payload_len = message_length;
+		} else if (message_length < 0xffff) {
+			frame_header[1] = 126;
+			header_len += 2;
 
-// 		if (message_length < 126) {
-// 			frame.payload_len = message_length;
-// 		} else if (message_length < 0xffff) {
-// 			frame.payload_len = 126;
-// 			frame.extended_payload_len = message_length;
-// 			frame_len += 2;
-// 		} else {
-// 			frame.payload_len = 127;
-// 			frame_len += 8;
-// 			frame.extended_payload_len = (message_length <= MAX_FRAME_SIZE) ? message_length : MAX_FRAME_SIZE;
-// 		}
+			uint16_t extended_payload_len_16 = htons(message_length & 0xFFFF);
+			memcpy(&frame_header[2], &extended_payload_len_16, sizeof(extended_payload_len_16));	
 
-// 		// build ws frame header 
-// 		// send_bytes(header);
-// 		// send_bytes(message);		
+			payload_len = message_length;
+		} else {
+			frame_header[1] = 127;
+			header_len += 8;
+
+			uint64_t extended_payload_len_64 = (message_length <= MAX_FRAME_SIZE) ? message_length : MAX_FRAME_SIZE;
+			payload_len = extended_payload_len_64;
+			extended_payload_len_64 = htobe64(payload_len);
+			memcpy(&frame_header[2], &extended_payload_len_64, sizeof(extended_payload_len_64));
+		}
+
+		// send frame header
+		if (send(connection->fd, frame_header, header_len, 0) == -1) {
+			perror("socket send");
+		}
 		
+		// send frame payload; 
+		if (send(connection->fd, message_bytes, payload_len, 0) == -1) {
+			perror("socket send");
+		}
 
+		message_bytes += MAX_FRAME_SIZE;
+		message_length -= MAX_FRAME_SIZE;
+	}
 
-// 		message_bytes += MAX_FRAME_SIZE;
-// 		message_length -= MAX_FRAME_SIZE;
-// 	}
-
-// 	return 0;
-// }
+	return 0;
+}
 
 
 
@@ -477,6 +494,26 @@ static void build_accept_header(char *accept_header, char *sec_websocket_key) {
 	sha1_output(hash_bytes, &context);
 
 	base64_encode(hash_bytes, 20, accept_header, &len);
+}
+
+/**
+ *  @brief						build the header of a ws frame
+ *
+ *  @param frame_header			array where the final header is going to be stored 
+ *  @param frame				pointer to the details of the websocket frame 
+ */
+static void build_ws_frame_header(uint8_t *frame_header, ws_frame_header_t *frame) {
+	frame_header[0] = frame->fin << 7 | frame->op_code;
+	frame_header[1] = frame->payload_len;
+
+	if (frame->payload_len == 126) {
+		frame_header[2] = frame->extended_payload_len >> 8 & 0xFF;
+		frame_header[3] = frame->extended_payload_len & 0xFF;
+	} else if (frame->payload_len == 127) {
+		for (int i = 0; i < 8; ++i) {
+			frame_header[9 - i] = frame->extended_payload_len >> i * 8;
+		}
+	}
 }
 
 
