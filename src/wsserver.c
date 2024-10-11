@@ -20,7 +20,6 @@ static int ws_handshake(ws_connection_t *);
 static void build_accept_header(char *header, char *sec_websocket_key);
 static int ws_receive_message(ws_connection_t *); 
 static void init_connections(int);
-static void build_ws_frame_header(uint8_t *frame_header, ws_frame_t *);
 
 static void *ws_server_listener_thread(void *);
 static void *ws_connection_thread(void *);
@@ -495,27 +494,6 @@ static void build_accept_header(char *accept_header, char *sec_websocket_key) {
 
 	base64_encode(hash_bytes, 20, accept_header, &len);
 }
-
-/**
- *  @brief						build the header of a ws frame
- *
- *  @param frame_header			array where the final header is going to be stored 
- *  @param frame				pointer to the details of the websocket frame 
- */
-static void build_ws_frame_header(uint8_t *frame_header, ws_frame_header_t *frame) {
-	frame_header[0] = frame->fin << 7 | frame->op_code;
-	frame_header[1] = frame->payload_len;
-
-	if (frame->payload_len == 126) {
-		frame_header[2] = frame->extended_payload_len >> 8 & 0xFF;
-		frame_header[3] = frame->extended_payload_len & 0xFF;
-	} else if (frame->payload_len == 127) {
-		for (int i = 0; i < 8; ++i) {
-			frame_header[9 - i] = frame->extended_payload_len >> i * 8;
-		}
-	}
-}
-
 
 static void init_connections(int start_pos) {
 	for (int i = start_pos; i < max_con; ++i) {
