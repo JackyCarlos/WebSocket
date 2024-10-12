@@ -342,14 +342,17 @@ ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t me
 	header_len = 2; 
 
 	for (int i = 0; i < frames; ++i) {
+		printf("round: %d\n", i);
+
 		// start packing
 		frame_header[0] = (message_length <= MAX_FRAME_SIZE) ? 0x80 : 0;
 		frame_header[0] |= (i == 0) ? message_type : 0x00;
 
+		// || Buffer Size < 26  
 		if (message_length < 126) {
 			frame_header[1] = message_length;
 			payload_len = message_length;
-		} else if (message_length < 0xffff) {
+		} else if (message_length < 0xFFFF) {
 			frame_header[1] = 126;
 			header_len += 2;
 
