@@ -315,23 +315,38 @@ ws_receive_message(ws_connection_t *ws_connection) {
 	return 0;
 }
 
+/**
+ *  @brief		wrapper function to send UTF-8 encoded text                                                
+ */
 int 
 send_ws_message_txt(ws_connection_t *connection, uint8_t *bytes, uint64_t length) {
 	return ws_send_message(connection, bytes, length, OPCODE_TEXT);
 }
 
+/**
+ *  @brief		wrapper function to send arbitrary binary data                                           
+ */
 int 
 send_ws_message_bin(ws_connection_t *connection, uint8_t *bytes, uint64_t length) {
 	return ws_send_message(connection, bytes, length, OPCODE_BINARY);
 }
 
 /**
- *  @brief                  send ws message
+ *  @brief						send ws message
  *
- *                                                    
+ *  @param connection 			the web socket connection struct  
+ *  @param message_bytes		the bytes to be transmitted over the established websocket connection
+ *  @param message_length		the amount of bytes to send. Most of the time this the length of the message bytes array
+ *  @param message_type			the available op codes according to the RFC
+ *  @return         			0 if the message has been transmitted successfully or -1 if the underlying connection has been closed                                                  
  */
 static int 
 ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type) {
+	if (connection == NULL) {
+		// Sigal connection struct has been cleared out
+		return -1;
+	}
+
 	int frames; // amount of frames to send
 	int header_len; 
 	uint8_t frame_header[10];
@@ -371,11 +386,13 @@ ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t me
 		// send frame header
 		if (send(connection->fd, frame_header, header_len, 0) == -1) {
 			perror("socket send");
+			return -1;
 		}
 		
 		// send frame payload; 
 		if (send(connection->fd, message_bytes, payload_len, 0) == -1) {
 			perror("socket send");
+			return -1;
 		}
 
 		message_bytes += MAX_FRAME_SIZE;
