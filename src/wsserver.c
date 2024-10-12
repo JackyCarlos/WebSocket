@@ -348,24 +348,22 @@ ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t me
 		frame_header[0] = (message_length <= MAX_FRAME_SIZE) ? 0x80 : 0;
 		frame_header[0] |= (i == 0) ? message_type : 0x00;
 
-		// || Buffer Size < 26  
-		if (message_length < 126) {
-			frame_header[1] = message_length;
-			payload_len = message_length;
-		} else if (message_length < 0xFFFF) {
+		// || Buffer Size < 126  
+		// MAX_FRAME_SIZE 0x1000
+		if (message_length < 126 || MAX_FRAME_SIZE < 126) {
+			frame_header[1] = payload_len = (message_length < MAX_FRAME_SIZE) ? message_length : MAX_FRAME_SIZE;
+		} else if (message_length <= 0xFFFF || MAX_FRAME_SIZE <= 0xFFFF) {
 			frame_header[1] = 126;
 			header_len += 2;
 
-			uint16_t extended_payload_len_16 = htons(message_length & 0xFFFF);
+			uint16_t extended_payload_len_16 = payload_len = (message_length < MAX_FRAME_SIZE) ? message_length : MAX_FRAME_SIZE;
+			extended_payload_len_16 = htons(extended_payload_len_16 & 0xFFFF);
 			memcpy(&frame_header[2], &extended_payload_len_16, sizeof(extended_payload_len_16));	
-
-			payload_len = message_length;
 		} else {
 			frame_header[1] = 127;
 			header_len += 8;
 
-			uint64_t extended_payload_len_64 = (message_length <= MAX_FRAME_SIZE) ? message_length : MAX_FRAME_SIZE;
-			payload_len = extended_payload_len_64;
+			uint64_t extended_payload_len_64 = payload_len = (message_length < MAX_FRAME_SIZE) ? message_length : MAX_FRAME_SIZE;
 			extended_payload_len_64 = htobe64(payload_len);
 			memcpy(&frame_header[2], &extended_payload_len_64, sizeof(extended_payload_len_64));
 		}
