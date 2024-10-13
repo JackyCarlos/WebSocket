@@ -21,6 +21,7 @@ static void build_accept_header(char *header, char *sec_websocket_key);
 static int ws_receive_message(ws_connection_t *); 
 static void init_connections(int);
 static int ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type);
+static void create_close_payload(int code, uint8_t *close_payload, int *close_reason_len);
 
 static void *ws_server_listener_thread(void *);
 static void *ws_connection_thread(void *);
@@ -37,6 +38,15 @@ enum handshake_headers {
 	WSKEY = 16,
 	WSVERSION = 8,
 	ORIGIN = 4
+};
+
+websocket_status_code_t websocket_codes[] = {
+	{ 1000, "normal closure" },
+	{ 1001, "going away" },
+	{ 1002, "protocol error" },
+	{ 1007, "data not consistent" },
+	{ 1009, "message too big to process" },
+	{ 1011, "unexpected serverside condition" }
 };
 
 /**
@@ -166,9 +176,18 @@ ws_connection_thread(void *connection) {
 		} else if (val == -1) {
 			break;
 		} else if (val == -2) {
-			;
-		} 
+			uint8_t close_payload[30];
+			int close_payload_len;
 
+			create_close_payload(1002, close_payload, &close_payload_len); 
+
+			if(ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE) == -1) {
+				break;
+			}
+
+			
+			
+		} 
 
 	}
 
@@ -527,6 +546,28 @@ static void build_accept_header(char *accept_header, char *sec_websocket_key) {
 	sha1_output(hash_bytes, &context);
 
 	base64_encode(hash_bytes, 20, accept_header, &len);
+}
+
+/**
+ *  @brief						create the payload of a closing message. This message consists of a 2 byte unsigned integer and an utf-8 string
+ *
+ *  @param code					status code to be used	
+ *  @param close_payload		array in which to store the payload
+ *  @param close_reason_len		the length of the constructed payload
+ */
+void create_close_payload(int code, uint8_t *close_payload, int *close_payload_len) {
+	int i;
+	for (i = 0; i < sizeof(websocket_codes); ++i) {
+		if (websocket_codes[i].code == code) {
+			break;
+		}
+	}
+
+	close_payload[0] = websocket_codes[i].code >> 8;
+	close_payload[1] = websocket_codes[i].code & 0xFF;
+	*close_payload_len = strlen(websocket_codes[i].reason);
+
+	memcpy(close_payload + 2, websocket_codes[i].reason, *close_payload_len);
 }
 
 static void init_connections(int start_pos) {
