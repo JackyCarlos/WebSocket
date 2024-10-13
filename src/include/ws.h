@@ -24,10 +24,15 @@ enum ws_op_code {
 	OPCODE_CONTINUATION = 0x00,
 	OPCODE_TEXT 		= 0x01,
 	OPCODE_BINARY 		= 0x02,
-	OPCODE_CON_CLOSE 	= 0x03,
-	OPCODE_PING 		= 0x08,
+	OPCODE_CON_CLOSE 	= 0x08,
+	OPCODE_PING 		= 0x09,
 	OPCODE_PONG 		= 0x0a
 };
+
+typedef struct {
+	uint16_t code;
+	char *reason;
+} websocket_status_code_t;
 
 typedef struct {
 	uint32_t fd;
@@ -39,6 +44,7 @@ typedef struct {
 	uint64_t message_length;
 	uint8_t message_type;
 } ws_connection_t;
+
 
 int ws_server(char *host_address, char *port);
 ws_connection_t *accept_ws_connection(void);
