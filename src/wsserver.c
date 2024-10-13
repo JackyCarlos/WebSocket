@@ -99,6 +99,7 @@ ws_server_listener_thread(void *param) {
 		connection->fd = newfd;
 		connection->status = CONNECTING;
 		connection->remote_addr = remote_addr;
+		connection->message = NULL;
 
 		pthread_t new_thread;
 		rc = pthread_create(&new_thread, NULL, ws_connection_thread, (void *) connection);
@@ -150,11 +151,22 @@ ws_connection_thread(void *connection) {
 
 	ws_connection->status = OPEN;
 
+	// 	0 if successful, -1 if the underlying socket got closed or an 
+	//  other error occured, -2 if the client sent an unmasked frame,
+	//  -3 if the client sent a message bigger than 64 KB       
+
 	int val;
 	for (;;) {
-		val = ws_receive_message(ws_connection);
+		val = ws_receive_message(ws_connection);		
+		
 		if (val == 0) {
 			on_message(ws_connection);
+			free(ws_connection->message);
+			ws_connection->message = NULL;
+		} else if (val == -1) {
+			break;
+		} else if (val == -2) {
+			;
 		} 
 
 
@@ -184,7 +196,6 @@ ws_connection_thread(void *connection) {
      |                     Payload Data continued ...                |
      +---------------------------------------------------------------+
 */
-
 
 /**
  *  @brief                  receive a websocket message
@@ -249,7 +260,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 			}
 		}
 
-		if (payload_length > 0x00100000) {
+		if (payload_length >= 0x0010000) {
 			// server should reply with an error code indicating to close the connection because frame size is bigger than 1 MB
 			return -3; 
 		}
@@ -343,7 +354,6 @@ send_ws_message_bin(ws_connection_t *connection, uint8_t *bytes, uint64_t length
 static int 
 ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type) {
 	if (connection == NULL) {
-		// Sigal connection struct has been cleared out
 		return -1;
 	}
 
@@ -526,9 +536,10 @@ static void init_connections(int start_pos) {
 }
 
 static void thread_cleanup_handler(void *arg) {
-	ws_connection_t *connection = (ws_connection_t *) arg;
+	ws_connection_t *ws_connection = (ws_connection_t *) arg;
 
-	connections[connection->thread_id] = NULL;
-	free(connection->message);
-	free(connection);
+	connections[ws_connection->thread_id] = NULL;
+	if (ws_connection->message != NULL)	free(ws_connection->message); 
+	free(ws_connection->message);
+	free(ws_connection);
 }
