@@ -36,7 +36,7 @@ typedef struct {
 	uint8_t thread_id;
 
 	uint8_t *message;
-	uint32_t message_length;
+	uint64_t message_length;
 	uint8_t message_type;
 } ws_connection_t;
 
