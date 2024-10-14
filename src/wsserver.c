@@ -185,6 +185,9 @@ ws_connection_thread(void *connection) {
 				break;
 			}
 
+			ws_connection->state = CLOSING;
+			ws_connection->close_sent = 1;
+
 			
 			
 		} 
@@ -249,7 +252,6 @@ ws_receive_message(ws_connection_t *ws_connection) {
 
 		// An unfragmented message consists of a single frame with the FIN
         // bit set (Section 5.2) and an opcode other than 0.
-
 		if (masked == 0 || (continuation_frame == 1 && op_code != 0)) {
 			// client sent an unmasked frame. consequence unknown
 			return -2; 
@@ -372,7 +374,10 @@ send_ws_message_bin(ws_connection_t *connection, uint8_t *bytes, uint64_t length
  */
 static int 
 ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type) {
-	if (connection == NULL) {
+	if (connection == NULL 
+		|| connection->status == CONNECTING 
+		|| (connection->status == CLOSING && connection->close_sent == 1)) { // hier fehlt, was wenn die Verbindung vom Peer geclosed wurde, soll es dann nur noch möglich sein ein Close Frame zu schicken? Ich würde sagen ja!
+
 		return -1;
 	}
 
