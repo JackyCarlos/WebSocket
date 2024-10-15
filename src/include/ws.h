@@ -38,6 +38,7 @@ typedef struct {
 	uint32_t fd;
 	uint32_t status;
 	struct sockaddr_storage remote_addr;
+	int close_sent;
 	uint8_t thread_id;
 
 	uint8_t *message;
