@@ -31,6 +31,8 @@ static ws_connection_t **connections;
 static int listening_fd;
 static int con_count = 0, max_con = 10;
 
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
 enum handshake_headers {
 	HOST = 128, 
 	UPGRADE = 64,
@@ -110,6 +112,7 @@ ws_server_listener_thread(void *param) {
 		connection->status = CONNECTING;
 		connection->remote_addr = remote_addr;
 		connection->message = NULL;
+		connection->close_sent = 0;
 
 		pthread_t new_thread;
 		rc = pthread_create(&new_thread, NULL, ws_connection_thread, (void *) connection);
@@ -173,19 +176,31 @@ ws_connection_thread(void *connection) {
 			on_message(ws_connection);
 			free(ws_connection->message);
 			ws_connection->message = NULL;
+		} else if(val == OPCODE_CON_CLOSE) {
+			if (ws_connection->message_length < 2) {
+				create_close_payload(1000, close_payload, &close_payload_len); 
+			} else {
+				uint16_t close_code == ws_connection->message[0] << 8 | ws_connection->message[1];
+
+				create_close_payload(close_code, close_payload, &close_payload_len); 
+			}
+			
+			ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE);
+			pthread_exit(NULL);
 		} else if (val == -1) {
+			// debug output client closed the tcp connection
 			break;
 		} else if (val == -2) {
-			uint8_t close_payload[30];
+			uint8_t close_payload[40];
 			int close_payload_len;
 
 			create_close_payload(1002, close_payload, &close_payload_len); 
 
-			if(ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE) == -1) {
-				break;
+			if (ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE) == -1) {
+				pthread_exit(NULL);
 			}
 
-			ws_connection->state = CLOSING;
+			ws_connection->status = CLOSING;
 			ws_connection->close_sent = 1;
 
 			
@@ -253,9 +268,13 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		// An unfragmented message consists of a single frame with the FIN
         // bit set (Section 5.2) and an opcode other than 0.
 		if (masked == 0 || (continuation_frame == 1 && op_code != 0)) {
-			// client sent an unmasked frame. consequence unknown
 			return -2; 
 		} 
+
+		// when a close has been sent, only parse close frames
+		if (ws_connection->close_sent == 1 && op_code != OPCODE_CON_CLOSE) {
+			return -99;
+		}
 
 		payload_length = frame_header[1] & 0x7F;
 		payload_start = 6;
@@ -321,9 +340,13 @@ ws_receive_message(ws_connection_t *ws_connection) {
 				printf("2");	
 				break;
 			case OPCODE_CON_CLOSE:
-				printf("3");
-				// do a clean up of the connection		
-				break;
+				if (ws_connection->close_sent == 1) {
+					pthread_exit(NULL);
+				}
+
+				ws_connection->status = CLOSING;
+				
+				return OPCODE_CON_CLOSE;
 			case OPCODE_PING:
 				printf("4");
 				// send pong frame
@@ -376,10 +399,14 @@ static int
 ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type) {
 	if (connection == NULL 
 		|| connection->status == CONNECTING 
-		|| (connection->status == CLOSING && connection->close_sent == 1)) { // hier fehlt, was wenn die Verbindung vom Peer geclosed wurde, soll es dann nur noch möglich sein ein Close Frame zu schicken? Ich würde sagen ja!
+		|| (connection->status == CLOSING && connection->close_sent == 1)
+		|| (connection->status == CLOSING && message_type != OPCODE_CON_CLOSE)) { 
+		// hier fehlt, was wenn die Verbindung vom Peer geclosed wurde, soll es dann nur noch möglich sein ein Close Frame zu schicken? Ich würde sagen ja!
 
 		return -1;
 	}
+
+	pthread_mutex_lock(&lock);
 
 	int frames; // amount of frames to send
 	int header_len; 
@@ -432,6 +459,8 @@ ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t me
 		message_bytes += MAX_FRAME_SIZE;
 		message_length -= MAX_FRAME_SIZE;
 	}
+
+	pthread_mutex_unlock(&lock);
 
 	return 0;
 }
@@ -586,6 +615,7 @@ static void thread_cleanup_handler(void *arg) {
 
 	connections[ws_connection->thread_id] = NULL;
 	if (ws_connection->message != NULL)	free(ws_connection->message); 
+	close(ws_connection->fd);
 	free(ws_connection->message);
 	free(ws_connection);
 }
