@@ -160,53 +160,70 @@ ws_connection_thread(void *connection) {
 		}
 	}
 
-	on_connection(connection);
-
 	ws_connection->status = OPEN;
+
+	on_connection(connection);
 
 	// 	0 if successful, -1 if the underlying socket got closed or an 
 	//  other error occured, -2 if the client sent an unmasked frame,
-	//  -3 if the client sent a message bigger than 64 KB       
+	//  -3 if the client sent a message bigger than 64 KB  
+
+	uint8_t close_payload[40];
+	int close_payload_len;     
 
 	int val;
 	for (;;) {
 		val = ws_receive_message(ws_connection);		
 		
-		if (val == 0) {
-			on_message(ws_connection);
-			free(ws_connection->message);
-			ws_connection->message = NULL;
-		} else if(val == OPCODE_CON_CLOSE) {
-			if (ws_connection->message_length < 2) {
-				create_close_payload(1000, close_payload, &close_payload_len); 
-			} else {
-				uint16_t close_code == ws_connection->message[0] << 8 | ws_connection->message[1];
-
-				create_close_payload(close_code, close_payload, &close_payload_len); 
-			}
-			
-			ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE);
-			pthread_exit(NULL);
-		} else if (val == -1) {
-			// debug output client closed the tcp connection
-			break;
-		} else if (val == -2) {
-			uint8_t close_payload[40];
-			int close_payload_len;
-
-			create_close_payload(1002, close_payload, &close_payload_len); 
-
-			if (ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE) == -1) {
+		switch (val) {
+			case 0:
+				on_message(ws_connection);
+				break;
+			case OPCODE_CON_CLOSE:
+				if (ws_connection->message_length < 2) {
+					create_close_payload(1000, close_payload, &close_payload_len); 
+				} else {
+					uint16_t close_code = ws_connection->message[0] << 8 | ws_connection->message[1];
+	
+					create_close_payload(close_code, close_payload, &close_payload_len); 
+				}
+				
+				printf("Closing now!\n");
+				ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE);
 				pthread_exit(NULL);
-			}
+				break;
+			case OPCODE_PING:
+				ws_send_message(ws_connection, ws_connection->message, ws_connection->message_length, OPCODE_PONG);
+				break;
+			case -1:
+				pthread_exit(NULL);
+				break;
+			case -2:
+				create_close_payload(1002, close_payload, &close_payload_len); 
 
-			ws_connection->status = CLOSING;
-			ws_connection->close_sent = 1;
+				if (ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE) == -1) {
+					pthread_exit(NULL);
+				}
 
-			
-			
-		} 
+				ws_connection->status = CLOSING;
+				ws_connection->close_sent = 1;
+				break;
+			case -3:
+				create_close_payload(1009, close_payload, &close_payload_len); 
 
+				if (ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE) == -1) {
+					pthread_exit(NULL);
+				}
+
+				ws_connection->status = CLOSING;
+				ws_connection->close_sent = 1;
+				break;
+			default:
+				break;			
+		}
+
+		free(ws_connection->message);
+		ws_connection->message = NULL;
 	}
 
 	pthread_cleanup_pop(1);
@@ -348,16 +365,12 @@ ws_receive_message(ws_connection_t *ws_connection) {
 				
 				return OPCODE_CON_CLOSE;
 			case OPCODE_PING:
-				printf("4");
-				// send pong frame
-				break;
+				return OPCODE_PING;
 			case OPCODE_PONG:
 				printf("5");
 				break;
 			default:
-				// send close frame	in order to fail the underlaying connection	
-				printf("6");
-				break;
+				return -2;
 		}
 
 		if (fin) {
@@ -397,24 +410,28 @@ send_ws_message_bin(ws_connection_t *connection, uint8_t *bytes, uint64_t length
  */
 static int 
 ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type) {
+	printf("connection: %d\n", connection->status);
+
 	if (connection == NULL 
 		|| connection->status == CONNECTING 
 		|| (connection->status == CLOSING && connection->close_sent == 1)
 		|| (connection->status == CLOSING && message_type != OPCODE_CON_CLOSE)) { 
 		// hier fehlt, was wenn die Verbindung vom Peer geclosed wurde, soll es dann nur noch möglich sein ein Close Frame zu schicken? Ich würde sagen ja!
-
+		printf("fail\n");
 		return -1;
 	}
-
+	printf("test1\n");
 	pthread_mutex_lock(&lock);
-
+	printf("test2\n");
 	int frames; // amount of frames to send
 	int header_len; 
 	uint8_t frame_header[10];
 	uint64_t payload_len;
 
-	frames = message_length / MAX_FRAME_SIZE;
+	frames = message_length / MAX_FRAME_SIZE;	
 	frames += (message_length % MAX_FRAME_SIZE == 0) ? 0 : 1;
+
+	if (message_length == 0) { frames = 1; }
 	header_len = 2; 
 
 	for (int i = 0; i < frames; ++i) {
@@ -594,8 +611,10 @@ void create_close_payload(int code, uint8_t *close_payload, int *close_payload_l
 	for (i = 0; i < sizeof(websocket_codes); ++i) {
 		if (websocket_codes[i].code == code) {
 			break;
-		}
+		} 
 	}
+
+	i -= (i == sizeof(websocket_codes)) ? 1 : 0;
 
 	close_payload[0] = websocket_codes[i].code >> 8;
 	close_payload[1] = websocket_codes[i].code & 0xFF;
@@ -616,6 +635,5 @@ static void thread_cleanup_handler(void *arg) {
 	connections[ws_connection->thread_id] = NULL;
 	if (ws_connection->message != NULL)	free(ws_connection->message); 
 	close(ws_connection->fd);
-	free(ws_connection->message);
 	free(ws_connection);
 }
