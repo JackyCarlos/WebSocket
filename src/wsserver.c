@@ -34,12 +34,22 @@ static int con_count = 0, max_con = 10;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 enum handshake_headers {
-	HOST = 128, 
-	UPGRADE = 64,
-	CONNECTION = 32,
-	WSKEY = 16,
-	WSVERSION = 8,
-	ORIGIN = 4
+	HOST			= 128, 
+	UPGRADE 		= 64,
+	CONNECTION 		= 32,
+	WSKEY 			= 16,
+	WSVERSION 		= 8,
+	ORIGIN 			= 4
+};
+
+enum message_return_codes {
+	RCV_DATA 					= 0,
+	RCV_PING					= 1,
+	RCV_PONG					= 2,
+	RCV_CON_CLOSE				= 3,
+	RCV_ERR_CONNECTION_LOST 	= -1,
+	RCV_ERR_PROTOCOLL 			= -2,
+	RCV_ERR_PAYLOAD_SIZE 		= -3 
 };
 
 websocket_status_code_t websocket_codes[] = {
@@ -80,7 +90,7 @@ ws_server(char *host_address, char *port) {
 		return -1;
 	}
 
-	printf("websocket server created. Listening on %s:%s\n", host_address, port);
+	DEBUG_PRINT("websocket server created. Listening on %s:%s\n", host_address, port);
 
 	return 0;
 }
@@ -176,10 +186,10 @@ ws_connection_thread(void *connection) {
 		val = ws_receive_message(ws_connection);		
 		
 		switch (val) {
-			case 0:
+			case RCV_DATA:
 				on_message(ws_connection);
 				break;
-			case OPCODE_CON_CLOSE:
+			case RCV_CON_CLOSE:
 				if (ws_connection->message_length < 2) {
 					create_close_payload(1000, close_payload, &close_payload_len); 
 				} else {
@@ -194,13 +204,15 @@ ws_connection_thread(void *connection) {
 				
 				pthread_exit(NULL);
 				break;
-			case OPCODE_PING:
+			case RCV_PING:
 				ws_send_message(ws_connection, ws_connection->message, ws_connection->message_length, OPCODE_PONG);
 				break;
-			case -1:
+			case RCV_PONG:
+				break;		// to be implemented
+			case RCV_ERR_CONNECTION_LOST:
 				pthread_exit(NULL);
 				break;
-			case -2:
+			case RCV_ERR_PROTOCOLL:
 				create_close_payload(1002, close_payload, &close_payload_len); 
 
 				if (ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE) == -1) {
@@ -210,7 +222,7 @@ ws_connection_thread(void *connection) {
 				ws_connection->status = CLOSING;
 				ws_connection->close_sent = 1;
 				break;
-			case -3:
+			case RCV_ERR_PAYLOAD_SIZE:
 				create_close_payload(1009, close_payload, &close_payload_len); 
 
 				if (ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE) == -1) {
@@ -257,10 +269,11 @@ ws_connection_thread(void *connection) {
  *  @brief                  receive a websocket message
  *
  *  @param ws_connection    ws_connection_t instance representing an open websocket connection 
- *  @return                 0 if successful, -1 if the underlying socket got closed or an 
- *                          	other error occured, -2 if the client sent an unmasked frame,
- *                          	-3 if the client sent a message bigger than 1 MB                                                      
+ *  @return                 RCV_DATA (0) frame with data successfully received, RCV_PING (1) ping frame, RCV_PONG (2) pong frame
+ * 							RCV_CON_CLOSE (3) close frame, RCV_ERR_CONNECTION_LOST (-1) if the underlying socket got closed,
+ * 							RCV_ERR_PROTOCOLL (-2) protocoll error i.e. client sent an unmasked frame, RCV_ERR_PAYLOAD_SIZE (-3) payload too big                                                 
  */
+
 static int
 ws_receive_message(ws_connection_t *ws_connection) {
 	uint8_t frame_header[14], mask[4];
@@ -276,7 +289,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		// evaluate status
 		if (recv_bytes(ws_connection->fd, frame_header, 2) < 0) {
 			// error receiving bytes from the socket, clean up the connection
-			return -1; 
+			return RCV_ERR_CONNECTION_LOST; 
 		}
 
 		fin = frame_header[0] & 0x80;
@@ -287,7 +300,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		// An unfragmented message consists of a single frame with the FIN
         // bit set (Section 5.2) and an opcode other than 0.
 		if (masked == 0 || (continuation_frame == 1 && op_code != 0)) {
-			return -2; 
+			return RCV_ERR_PROTOCOLL; 
 		} 
 
 		// when a close has been sent, only parse close frames
@@ -305,8 +318,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		}
 
 		if (recv_bytes(ws_connection->fd, frame_header + 2, payload_start - 2) < 0) {
-			// error receiving bytes from the socket, clean up the connection
-			return -1; 
+			return RCV_ERR_CONNECTION_LOST; 
 		}
 		
 		if (payload_length == 126) {
@@ -321,7 +333,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 
 		if (payload_length >= 0x0010000) {
 			// server should reply with an error code indicating to close the connection because frame size is bigger than 1 MB
-			return -3; 
+			return RCV_ERR_PAYLOAD_SIZE; 
 		}
 
 		if (continuation_frame == 0) {
@@ -331,8 +343,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		}
 	
 		if (recv_bytes(ws_connection->fd, ws_connection->message + ws_connection->message_length, payload_length) < 0) {
-			// error receiving bytes from the socket, clean up the connection
-			return -1; 
+			return RCV_ERR_CONNECTION_LOST; 
 		}
 
 		ws_connection->message_length += payload_length;
@@ -350,13 +361,10 @@ ws_receive_message(ws_connection_t *ws_connection) {
 
 		switch (op_code) {
 			case OPCODE_CONTINUATION: 
-				printf("0");
 				break;
 			case OPCODE_TEXT:
-				printf("1");
 				break;
-			case OPCODE_BINARY:
-				printf("2");	
+			case OPCODE_BINARY:	
 				break;
 			case OPCODE_CON_CLOSE:
 				if (ws_connection->close_sent == 1) {
@@ -365,14 +373,13 @@ ws_receive_message(ws_connection_t *ws_connection) {
 
 				ws_connection->status = CLOSING;
 				
-				return OPCODE_CON_CLOSE;
+				return RCV_CON_CLOSE;
 			case OPCODE_PING:
-				return OPCODE_PING;
+				return RCV_PING;
 			case OPCODE_PONG:
-				printf("5");
-				break;
+				return RCV_PONG;
 			default:
-				return -2;
+				return RCV_ERR_PROTOCOLL;
 		}
 
 		if (fin) {
@@ -382,7 +389,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 		}
 	}
 
-	return 0;
+	return RCV_DATA;
 }
 
 /**
