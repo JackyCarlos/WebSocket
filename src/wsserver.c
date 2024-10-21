@@ -188,8 +188,10 @@ ws_connection_thread(void *connection) {
 					create_close_payload(close_code, close_payload, &close_payload_len); 
 				}
 				
-				printf("Closing now!\n");
-				ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE);
+				if (ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE) == -1) {
+					pthread_exit(NULL);
+				}
+				
 				pthread_exit(NULL);
 				break;
 			case OPCODE_PING:
@@ -410,19 +412,15 @@ send_ws_message_bin(ws_connection_t *connection, uint8_t *bytes, uint64_t length
  */
 static int 
 ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type) {
-	printf("connection: %d\n", connection->status);
-
 	if (connection == NULL 
 		|| connection->status == CONNECTING 
 		|| (connection->status == CLOSING && connection->close_sent == 1)
 		|| (connection->status == CLOSING && message_type != OPCODE_CON_CLOSE)) { 
-		// hier fehlt, was wenn die Verbindung vom Peer geclosed wurde, soll es dann nur noch möglich sein ein Close Frame zu schicken? Ich würde sagen ja!
-		printf("fail\n");
 		return -1;
 	}
-	printf("test1\n");
+
 	pthread_mutex_lock(&lock);
-	printf("test2\n");
+
 	int frames; // amount of frames to send
 	int header_len; 
 	uint8_t frame_header[10];
@@ -435,8 +433,6 @@ ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t me
 	header_len = 2; 
 
 	for (int i = 0; i < frames; ++i) {
-		printf("round: %d\n", i);
-
 		// start packing
 		frame_header[0] = (message_length <= MAX_FRAME_SIZE) ? 0x80 : 0;
 		frame_header[0] |= (i == 0) ? message_type : 0x00;
@@ -466,7 +462,7 @@ ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t me
 			perror("socket send");
 			return -1;
 		}
-		
+
 		// send frame payload; 
 		if (send(connection->fd, message_bytes, payload_len, 0) == -1) {
 			perror("socket send");
