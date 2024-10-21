@@ -1,16 +1,20 @@
-CC			= gcc
-CFLAGS		= -Wall
-LDFLAGS		= -lpthread
-OBJFILES	= main.o wsserver.o http/http.o utils/utils.o sha1/sha1.o base64/base64.o
-TARGET		= wsserver
-INC			= -I ./include -I ./sha1 -I ./base64 -I ./utils -I ./http
-OBJDIR		= obj
-SRCDIR		= src
+CC          = gcc
+CFLAGS      = -Wall
+LDFLAGS     = -lpthread
+OBJFILES    = main.o wsserver.o http/http.o utils/utils.o sha1/sha1.o base64/base64.o
+TARGET      = wsserver
+INC         = -I ./include -I ./sha1 -I ./base64 -I ./utils -I ./http
+OBJDIR      = obj
+SRCDIR      = src
+DEBUGFLAGS  = -DDEBUG_MODE -g
 
 all: $(TARGET)
 
 $(TARGET): $(OBJFILES)
 	$(CC) $(INC) $(CFLAGS) -o $(TARGET) $(OBJFILES) $(LDFLAGS)
+
+debug: CFLAGS += $(DEBUGFLAGS)
+debug: $(TARGET)
 
 main.o: main.c 
 	$(CC) $(INC) $(CFLAGS) -c main.c

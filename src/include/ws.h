@@ -9,6 +9,8 @@
 #include <stdint.h>
 #include <pthread.h>
 
+#include "../debug/debug.h"
+
 #define 	MAX_CON 		10
 #define 	GUID			"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 #define 	MAX_FRAME_SIZE	0x0010000
