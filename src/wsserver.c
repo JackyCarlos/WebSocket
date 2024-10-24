@@ -52,7 +52,7 @@ enum message_return_codes {
 	RCV_ERR_PAYLOAD_SIZE 		= -3 
 };
 
-websocket_status_code_t websocket_codes[] = {
+websocket_status_code_t websocket_close_codes[] = {
 	{ 1000, "normal closure" },
 	{ 1001, "going away" },
 	{ 1002, "protocol error" },
@@ -197,6 +197,8 @@ ws_connection_thread(void *connection) {
 	
 					create_close_payload(close_code, close_payload, &close_payload_len); 
 				}
+
+				printf("success\n");
 				
 				if (ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE) == -1) {
 					pthread_exit(NULL);
@@ -533,7 +535,8 @@ ws_handshake(ws_connection_t *con) {
 	for (int i = 0; i < hcount; ++i) {
 		if (!strcmp(request_headers[i].header, "Host")) {
 			status |= HOST;
-		} else if (!(strcmp(request_headers[i].header, "Upgrade") || strcmp(request_headers[i].value, "websocket"))) {
+		} else if (!strcmp(request_headers[i].header, "Upgrade") && 
+        				(!strcmp(request_headers[i].value, "websocket") || !strcmp(request_headers[i].value, "WebSocket"))) {
 			status |= UPGRADE;
 		} else if (!(strcmp(request_headers[i].header, "Connection") || strcmp(request_headers[i].value, "Upgrade"))) {
 			status |= CONNECTION;
@@ -553,6 +556,7 @@ ws_handshake(ws_connection_t *con) {
 
 	if (status < 248) {
 		fprintf(stderr, "bad request\n");
+		fprintf(stderr, "status: %d\n", status);
 		response_headers[0] = (http_header_t) { "Sec-WebSocket-Version", "13" };
 		((status & WSVERSION) == WSVERSION) ? build_http_response(http_response, 400, NULL, 0) : build_http_response(http_response, 426, response_headers, 1);
 	
@@ -611,19 +615,23 @@ static void build_accept_header(char *accept_header, char *sec_websocket_key) {
  */
 void create_close_payload(int code, uint8_t *close_payload, int *close_payload_len) {
 	int i;
-	for (i = 0; i < sizeof(websocket_codes); ++i) {
-		if (websocket_codes[i].code == code) {
+	int close_codes_size;
+	
+	close_codes_size = sizeof(websocket_close_codes) / sizeof(websocket_status_code_t);
+
+	for (i = 0; i < close_codes_size; ++i) {
+		if (websocket_close_codes[i].code == code) {
 			break;
 		} 
 	}
 
-	i -= (i == sizeof(websocket_codes)) ? 1 : 0;
+	i -= (i == close_codes_size) ? 1 : 0;
 
-	close_payload[0] = websocket_codes[i].code >> 8;
-	close_payload[1] = websocket_codes[i].code & 0xFF;
-	*close_payload_len = strlen(websocket_codes[i].reason);
+	close_payload[0] = websocket_close_codes[i].code >> 8;
+	close_payload[1] = websocket_close_codes[i].code & 0xFF;
+	*close_payload_len = strlen(websocket_close_codes[i].reason);
 
-	memcpy(close_payload + 2, websocket_codes[i].reason, *close_payload_len);
+	memcpy(close_payload + 2, websocket_close_codes[i].reason, *close_payload_len);
 }
 
 static void init_connections(int start_pos) {
