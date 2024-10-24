@@ -31,6 +31,11 @@ enum ws_op_code {
 	OPCODE_PONG 		= 0x0a
 };
 
+enum ws_message_type {
+	MESSAGE_TYPE_TXT = 0x01,
+	MESSAGE_TYPE_BIN = 0x02
+};
+
 typedef struct {
 	uint16_t code;
 	char *reason;
