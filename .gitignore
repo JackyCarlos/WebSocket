@@ -52,3 +52,5 @@ Mkfile.old
 dkms.conf
 
 wsserver
+main
+src/sha1/sha1sum*
