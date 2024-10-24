@@ -365,8 +365,10 @@ ws_receive_message(ws_connection_t *ws_connection) {
 			case OPCODE_CONTINUATION: 
 				break;
 			case OPCODE_TEXT:
+				ws_connection->message_type = MESSAGE_TYPE_TXT;
 				break;
 			case OPCODE_BINARY:	
+				ws_connection->message_type = MESSAGE_TYPE_BIN;
 				break;
 			case OPCODE_CON_CLOSE:
 				if (ws_connection->close_sent == 1) {
@@ -468,13 +470,13 @@ ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t me
 
 		// send frame header
 		if (send(connection->fd, frame_header, header_len, 0) == -1) {
-			perror("socket send");
+			//perror("socket send");
 			return -1;
 		}
 
 		// send frame payload; 
 		if (send(connection->fd, message_bytes, payload_len, 0) == -1) {
-			perror("socket send");
+			//perror("socket send");
 			return -1;
 		}
 
