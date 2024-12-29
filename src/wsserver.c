@@ -333,7 +333,7 @@ ws_receive_message(ws_connection_t *ws_connection) {
 			}
 		}
 
-		if (payload_length >= 0x0010000) {
+		if (payload_length >= MAX_FRAME_SIZE_RCV) {
 			// server should reply with an error code indicating to close the connection because frame size is bigger than 1 MB
 			return RCV_ERR_PAYLOAD_SIZE; 
 		}
@@ -437,33 +437,33 @@ ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t me
 	uint8_t frame_header[10];
 	uint64_t payload_len;
 
-	frames = message_length / MAX_FRAME_SIZE;	
-	frames += (message_length % MAX_FRAME_SIZE == 0) ? 0 : 1;
+	frames = message_length / MAX_FRAME_SIZE_SND;	
+	frames += (message_length % MAX_FRAME_SIZE_SND == 0) ? 0 : 1;
 
 	if (message_length == 0) { frames = 1; }
 	header_len = 2; 
 
 	for (int i = 0; i < frames; ++i) {
 		// start packing
-		frame_header[0] = (message_length <= MAX_FRAME_SIZE) ? 0x80 : 0;
+		frame_header[0] = (message_length <= MAX_FRAME_SIZE_SND) ? 0x80 : 0;
 		frame_header[0] |= (i == 0) ? message_type : 0x00;
 
 		// || Buffer Size < 126  
 		// MAX_FRAME_SIZE 0x1000
-		if (message_length < 126 || MAX_FRAME_SIZE < 126) {
-			frame_header[1] = payload_len = (message_length < MAX_FRAME_SIZE) ? message_length : MAX_FRAME_SIZE;
-		} else if (message_length <= 0xFFFF || MAX_FRAME_SIZE <= 0xFFFF) {
+		if (message_length < 126 || MAX_FRAME_SIZE_SND < 126) {
+			frame_header[1] = payload_len = (message_length < MAX_FRAME_SIZE_SND) ? message_length : MAX_FRAME_SIZE_SND;
+		} else if (message_length <= 0xFFFF || MAX_FRAME_SIZE_SND <= 0xFFFF) {
 			frame_header[1] = 126;
 			header_len += 2;
 
-			uint16_t extended_payload_len_16 = payload_len = (message_length < MAX_FRAME_SIZE) ? message_length : MAX_FRAME_SIZE;
+			uint16_t extended_payload_len_16 = payload_len = (message_length < MAX_FRAME_SIZE_SND) ? message_length : MAX_FRAME_SIZE_SND;
 			extended_payload_len_16 = htons(extended_payload_len_16 & 0xFFFF);
 			memcpy(&frame_header[2], &extended_payload_len_16, sizeof(extended_payload_len_16));	
 		} else {
 			frame_header[1] = 127;
 			header_len += 8;
 
-			uint64_t extended_payload_len_64 = payload_len = (message_length < MAX_FRAME_SIZE) ? message_length : MAX_FRAME_SIZE;
+			uint64_t extended_payload_len_64 = payload_len = (message_length < MAX_FRAME_SIZE_SND) ? message_length : MAX_FRAME_SIZE_SND;
 			extended_payload_len_64 = htobe64(payload_len);
 			memcpy(&frame_header[2], &extended_payload_len_64, sizeof(extended_payload_len_64));
 		}
@@ -480,8 +480,8 @@ ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t me
 			return -1;
 		}
 
-		message_bytes += MAX_FRAME_SIZE;
-		message_length -= MAX_FRAME_SIZE;
+		message_bytes += MAX_FRAME_SIZE_SND;
+		message_length -= MAX_FRAME_SIZE_SND;
 	}
 
 	pthread_mutex_unlock(&lock);
