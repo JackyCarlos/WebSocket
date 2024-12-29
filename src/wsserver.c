@@ -379,6 +379,10 @@ ws_receive_message(ws_connection_t *ws_connection) {
 				
 				return RCV_CON_CLOSE;
 			case OPCODE_PING:
+				if (payload_length > 125) {
+					return RCV_ERR_PROTOCOLL;
+				}
+
 				return RCV_PING;
 			case OPCODE_PONG:
 				return RCV_PONG;
