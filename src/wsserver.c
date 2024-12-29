@@ -301,7 +301,9 @@ ws_receive_message(ws_connection_t *ws_connection) {
 
 		// An unfragmented message consists of a single frame with the FIN
         // bit set (Section 5.2) and an opcode other than 0.
-		if (masked == 0 || (continuation_frame == 1 && op_code != 0)) {
+		if (masked == 0 
+			|| (continuation_frame == 1 && op_code != 0)
+			|| rsv != 0) {
 			return RCV_ERR_PROTOCOLL; 
 		} 
 
