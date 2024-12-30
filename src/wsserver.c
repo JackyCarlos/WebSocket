@@ -303,7 +303,8 @@ ws_receive_message(ws_connection_t *ws_connection) {
         // bit set (Section 5.2) and an opcode other than 0.
 		if (masked == 0 
 			|| (continuation_frame == 1 && op_code != 0)
-			|| rsv != 0) {
+			|| rsv != 0
+			|| (fin == 0 && op_code & 0x8)) {
 			return RCV_ERR_PROTOCOLL; 
 		} 
 
@@ -350,8 +351,6 @@ ws_receive_message(ws_connection_t *ws_connection) {
 			return RCV_ERR_CONNECTION_LOST; 
 		}
 
-		ws_connection->message_length += payload_length;
-
 		// get Masking-Key
 		mask[0] = frame_header[payload_start - 4]; 
 		mask[1] = frame_header[payload_start - 3];
@@ -360,8 +359,10 @@ ws_receive_message(ws_connection_t *ws_connection) {
 
 		// unmask
 		for (int i = 0; i < payload_length; ++i) {
-			ws_connection->message[i] ^= mask[i % 4];
+			ws_connection->message[i + ws_connection->message_length] ^= mask[i % 4];
 		}
+
+		ws_connection->message_length += payload_length;
 
 		switch (op_code) {
 			case OPCODE_CONTINUATION: 
@@ -489,6 +490,8 @@ ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t me
 		message_bytes += MAX_FRAME_SIZE_SND;
 		message_length -= MAX_FRAME_SIZE_SND;
 	}
+
+	usleep(500000); 
 
 	pthread_mutex_unlock(&lock);
 
