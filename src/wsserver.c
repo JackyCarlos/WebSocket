@@ -18,7 +18,7 @@
 
 static int ws_handshake(ws_connection_t *);
 static void build_accept_header(char *header, char *sec_websocket_key);
-static int ws_receive_message(ws_connection_t *); 
+static int ws_process_message(ws_connection_t *); 
 static void init_connections(int);
 static int ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type);
 static void create_close_payload(int code, uint8_t *close_payload, int *close_reason_len);
@@ -183,8 +183,13 @@ ws_connection_thread(void *connection) {
 
 	int val;
 	for (;;) {
-		val = ws_receive_message(ws_connection);		
+		val = ws_process_message(ws_connection);		
 		
+
+
+
+
+		// ==============================
 		switch (val) {
 			case RCV_DATA:
 				on_message(ws_connection);
@@ -277,10 +282,27 @@ ws_connection_thread(void *connection) {
  */
 
 static int
-ws_receive_message(ws_connection_t *ws_connection) {
+ws_process_message(ws_connection_t *ws_connection) {
 	uint8_t frame_header[14], mask[4];
 	uint8_t fin, rsv, op_code, masked, payload_start;
 	unsigned long payload_length;
+
+	for (;;) {
+		if (recv_bytes(ws_connection->fd, frame_header, 2) < 0) {
+			// error receiving bytes from the socket, clean up the connection
+			return RCV_ERR_CONNECTION_LOST; 
+		}
+
+		fin = frame_header[0] & 0x80;
+		rsv = frame_header[0] & 0x70;
+		op_code = frame_header[0] & 0x0F;
+		masked = frame_header[1] & 0x80;	
+		
+		
+	}
+
+
+
 	int continuation_frame;
 
 	continuation_frame = 0;
