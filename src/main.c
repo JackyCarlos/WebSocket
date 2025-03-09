@@ -8,6 +8,11 @@ void on_connection(ws_connection_t *connection) {
     printf("New connection established!\n");
 }
 
+// void on_message(ws_connection_t *ws_connection) {
+//     printf("got text message: %.*s\n", (int) ws_connection->message_length, (char *) ws_connection->message);
+
+// }
+
 void on_message(ws_connection_t *ws_connection) {
     if (ws_connection->message_type == MESSAGE_TYPE_TXT) {
         DEBUG_PRINT("sending text message\n");
