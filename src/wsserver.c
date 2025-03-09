@@ -21,6 +21,8 @@ static void build_accept_header(char *header, char *sec_websocket_key);
 static int ws_process_message(ws_connection_t *); 
 static void init_connections(int);
 static int ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type);
+
+
 static void create_close_payload(int code, uint8_t *close_payload, int *close_reason_len);
 
 static void *ws_server_listener_thread(void *);
@@ -32,6 +34,15 @@ static int listening_fd;
 static int con_count = 0, max_con = 10;
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
+
+
+static void handle_data_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header);
+static void handle_ping_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header);
+static void handle_close_frame(ws_connection_t * ws_connection, ws_frame_header_t *frame_header);
+
+
+
 
 enum handshake_headers {
 	HOST			= 128, 
@@ -122,6 +133,7 @@ ws_server_listener_thread(void *param) {
 		connection->status = CONNECTING;
 		connection->remote_addr = remote_addr;
 		connection->message = NULL;
+		connection->message_length = 0;
 		connection->close_sent = 0;
 
 		pthread_t new_thread;
@@ -165,6 +177,7 @@ ws_connection_thread(void *connection) {
 	
 	while (status != 0) {
 		status = ws_handshake(connection);
+
 		if (status == -2) {
 			pthread_exit(NULL);
 		}
@@ -281,131 +294,96 @@ ws_connection_thread(void *connection) {
  * 							RCV_ERR_PROTOCOLL (-2) protocoll error i.e. client sent an unmasked frame, RCV_ERR_PAYLOAD_SIZE (-3) payload too big                                                 
  */
 
+
+ /*
+ typedef struct {
+	uint8_t fin;
+	uint8_t rsv;
+	uint8_t op_code;
+	uint8_t masked;
+	uint8_t mask[4];
+	unsigned long payload_length;	
+} ws_frame_header_t;
+ */
+
+
 static int
 ws_process_message(ws_connection_t *ws_connection) {
-	uint8_t frame_header[14], mask[4];
-	uint8_t fin, rsv, op_code, masked, payload_start;
-	unsigned long payload_length;
+	ws_frame_header_t frame_header;
+	int payload_start;
+
+	uint8_t raw_header[14];
 
 	for (;;) {
-		if (recv_bytes(ws_connection->fd, frame_header, 2) < 0) {
+		if (recv_bytes(ws_connection->fd, raw_header, 2) < 0) {
 			// error receiving bytes from the socket, clean up the connection
 			return RCV_ERR_CONNECTION_LOST; 
 		}
 
-		fin = frame_header[0] & 0x80;
-		rsv = frame_header[0] & 0x70;
-		op_code = frame_header[0] & 0x0F;
-		masked = frame_header[1] & 0x80;	
-		
-		
-	}
-
-
-
-	int continuation_frame;
-
-	continuation_frame = 0;
-	ws_connection->message_length = 0;
-
-	// infinite loop for receiving all frames of a message
-	for (;;) {
-		// evaluate status
-		if (recv_bytes(ws_connection->fd, frame_header, 2) < 0) {
-			// error receiving bytes from the socket, clean up the connection
-			return RCV_ERR_CONNECTION_LOST; 
-		}
-
-		fin = frame_header[0] & 0x80;
-		rsv = frame_header[0] & 0x70;
-		op_code = frame_header[0] & 0x0F;
-		masked = frame_header[1] & 0x80;
-
-		// An unfragmented message consists of a single frame with the FIN
-        // bit set (Section 5.2) and an opcode other than 0.
-		if (masked == 0 
-			|| (continuation_frame == 1 && op_code != 0)
-			|| rsv != 0) {
-			return RCV_ERR_PROTOCOLL; 
-		} 
-
-		// when a close has been sent, only parse close frames
-		if (ws_connection->close_sent == 1 && op_code != OPCODE_CON_CLOSE) {
-			return -99;
-		}
-
-		payload_length = frame_header[1] & 0x7F;
+		frame_header.fin = raw_header[0] & 0x80;
+		frame_header.rsv = raw_header[0] & 0x70;
+		frame_header.op_code = raw_header[0] & 0x0F;
+		frame_header.masked = raw_header[1] & 0x80;	
+		frame_header.payload_length = raw_header[1] & 0x7F;
 		payload_start = 6;
-
-		if (payload_length == 126) {
+		
+		if (frame_header.masked == 0 
+			|| frame_header.rsv != 0 
+		    || (ws_connection->message != NULL && frame_header.op_code != 0) ) {
+			return RCV_ERR_PROTOCOLL;
+		}
+	
+		if (frame_header.payload_length == 126) {
 			payload_start = 8;
-		} else if (payload_length == 127) {
+		} else if (frame_header.payload_length == 127) {
 			payload_start = 14;
 		}
 
-		if (recv_bytes(ws_connection->fd, frame_header + 2, payload_start - 2) < 0) {
+		if (recv_bytes(ws_connection->fd, raw_header + 2, payload_start - 2) < 0) {
 			return RCV_ERR_CONNECTION_LOST; 
 		}
 		
-		if (payload_length == 126) {
-			payload_length = (long) frame_header[2] << 8 | (long) frame_header[3];
-		} else if (payload_length == 127) {
-			payload_length = 0;
+		if (frame_header.payload_length == 126) {
+			frame_header.payload_length = (long) raw_header[2] << 8 | (long) raw_header[3];
+		} else if (frame_header.payload_length == 127) {
+			frame_header.payload_length = 0;
 			
 			for (int i = 0; i < 8; ++i) {
-				payload_length |= (long) frame_header[2 + i] << 8 * (7 - i);
+				frame_header.payload_length |= (long) raw_header[2 + i] << 8 * (7 - i);
 			}
 		}
 
-		if (payload_length >= MAX_FRAME_SIZE_RCV) {
+		if (frame_header.payload_length >= MAX_FRAME_SIZE_RCV) {
 			// server should reply with an error code indicating to close the connection because frame size is bigger than 1 MB
 			return RCV_ERR_PAYLOAD_SIZE; 
 		}
 
-		if (continuation_frame == 0) {
-			ws_connection->message = (uint8_t *) malloc(payload_length);
-		} else {
-			ws_connection->message = (uint8_t *) realloc(ws_connection->message, ws_connection->message_length + payload_length);
-		}
-	
-		if (recv_bytes(ws_connection->fd, ws_connection->message + ws_connection->message_length, payload_length) < 0) {
-			return RCV_ERR_CONNECTION_LOST; 
-		}
+		frame_header.mask[0] = raw_header[payload_start - 4]; 
+		frame_header.mask[1] = raw_header[payload_start - 3];
+		frame_header.mask[2] = raw_header[payload_start - 2];
+		frame_header.mask[3] = raw_header[payload_start - 1];
 
-		ws_connection->message_length += payload_length;
-
-		// get Masking-Key
-		mask[0] = frame_header[payload_start - 4]; 
-		mask[1] = frame_header[payload_start - 3];
-		mask[2] = frame_header[payload_start - 2];
-		mask[3] = frame_header[payload_start - 1];
-
-		// unmask
-		for (int i = 0; i < payload_length; ++i) {
-			ws_connection->message[i] ^= mask[i % 4];
-		}
-
-		switch (op_code) {
+		switch (frame_header.op_code) {
 			case OPCODE_CONTINUATION: 
+				handle_data_frame(ws_connection, &frame_header);
+
 				break;
 			case OPCODE_TEXT:
 				ws_connection->message_type = MESSAGE_TYPE_TXT;
+				
+				handle_data_frame(ws_connection, &frame_header);
 				break;
 			case OPCODE_BINARY:	
 				ws_connection->message_type = MESSAGE_TYPE_BIN;
+				
+				handle_data_frame(ws_connection, &frame_header);
 				break;
 			case OPCODE_CON_CLOSE:
-				if (ws_connection->close_sent == 1) {
-					pthread_exit(NULL);
-				}
+				handle_close_frame(NULL, NULL);
 
-				ws_connection->status = CLOSING;
-				
 				return RCV_CON_CLOSE;
 			case OPCODE_PING:
-				if (payload_length > 125) {
-					return RCV_ERR_PROTOCOLL;
-				}
+				handle_ping_frame(NULL, NULL);
 
 				return RCV_PING;
 			case OPCODE_PONG:
@@ -414,15 +392,52 @@ ws_process_message(ws_connection_t *ws_connection) {
 				return RCV_ERR_PROTOCOLL;
 		}
 
-		if (fin) {
+
+
+
+
+
+		if (frame_header.fin) {
 			break;
-		} else {
-			continuation_frame = 1;
 		}
+
 	}
 
 	return RCV_DATA;
 }
+
+static void
+handle_data_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header) {
+	if (ws_connection->message == NULL) {
+		ws_connection->message = (uint8_t *) malloc(frame_header->payload_length);
+	} else {
+		ws_connection->message = (uint8_t *) realloc(ws_connection->message, ws_connection->message_length + frame_header->payload_length);
+	}
+
+	if (recv_bytes(ws_connection->fd, ws_connection->message + ws_connection->message_length, frame_header->payload_length) < 0) {
+		pthread_exit(NULL);
+	}
+
+	// to be put in a separate function
+	for (int i = 0; i < frame_header->payload_length; ++i) {
+		ws_connection->message[i + ws_connection->message_length] ^= frame_header->mask[i % 4];
+	}
+
+	ws_connection->message_length += frame_header->payload_length;
+}
+
+static void handle_close_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header) {
+	return;
+}
+
+static void handle_ping_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header) {
+	
+	
+	return;
+}
+
+
+
 
 /**
  *  @brief		wrapper function to send UTF-8 encoded text                                                
