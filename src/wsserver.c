@@ -39,8 +39,8 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void handle_data_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header);
 static void handle_ping_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header);
-static void handle_close_frame(ws_connection_t * ws_connection, ws_frame_header_t *frame_header);
-
+static void handle_close_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header);
+static void handle_error(ws_connection_t *ws_connection, int close_code);
 
 
 
@@ -191,73 +191,18 @@ ws_connection_thread(void *connection) {
 	//  other error occured, -2 if the client sent an unmasked frame,
 	//  -3 if the client sent a message bigger than 64 KB  
 
-	uint8_t close_payload[40];
-	int close_payload_len;     
-
 	int val;
 	for (;;) {
 		val = ws_process_message(ws_connection);		
 		
-
-
-
-
-		// ==============================
-		switch (val) {
-			case RCV_DATA:
-				on_message(ws_connection);
-				break;
-			case RCV_CON_CLOSE:
-				if (ws_connection->message_length < 2) {
-					create_close_payload(1000, close_payload, &close_payload_len); 
-				} else {
-					uint16_t close_code = ws_connection->message[0] << 8 | ws_connection->message[1];
-	
-					create_close_payload(close_code, close_payload, &close_payload_len); 
-				}
-
-				printf("success\n");
-				
-				if (ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE) == -1) {
-					pthread_exit(NULL);
-				}
-				
-				pthread_exit(NULL);
-				break;
-			case RCV_PING:
-				ws_send_message(ws_connection, ws_connection->message, ws_connection->message_length, OPCODE_PONG);
-				break;
-			case RCV_PONG:
-				break;		// to be implemented
-			case RCV_ERR_CONNECTION_LOST:
-				pthread_exit(NULL);
-				break;
-			case RCV_ERR_PROTOCOLL:
-				create_close_payload(1002, close_payload, &close_payload_len); 
-
-				if (ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE) == -1) {
-					pthread_exit(NULL);
-				}
-
-				ws_connection->status = CLOSING;
-				ws_connection->close_sent = 1;
-				break;
-			case RCV_ERR_PAYLOAD_SIZE:
-				create_close_payload(1009, close_payload, &close_payload_len); 
-
-				if (ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE) == -1) {
-					pthread_exit(NULL);
-				}
-
-				ws_connection->status = CLOSING;
-				ws_connection->close_sent = 1;
-				break;
-			default:
-				break;			
-		}
+		if (val == RCV_DATA && ws_connection->message_length > 0) {
+			on_message(ws_connection);
+		} 
 
 		free(ws_connection->message);
+		ws_connection->message_length = 0; 
 		ws_connection->message = NULL;
+
 	}
 
 	pthread_cleanup_pop(1);
@@ -294,19 +239,6 @@ ws_connection_thread(void *connection) {
  * 							RCV_ERR_PROTOCOLL (-2) protocoll error i.e. client sent an unmasked frame, RCV_ERR_PAYLOAD_SIZE (-3) payload too big                                                 
  */
 
-
- /*
- typedef struct {
-	uint8_t fin;
-	uint8_t rsv;
-	uint8_t op_code;
-	uint8_t masked;
-	uint8_t mask[4];
-	unsigned long payload_length;	
-} ws_frame_header_t;
- */
-
-
 static int
 ws_process_message(ws_connection_t *ws_connection) {
 	ws_frame_header_t frame_header;
@@ -316,8 +248,7 @@ ws_process_message(ws_connection_t *ws_connection) {
 
 	for (;;) {
 		if (recv_bytes(ws_connection->fd, raw_header, 2) < 0) {
-			// error receiving bytes from the socket, clean up the connection
-			return RCV_ERR_CONNECTION_LOST; 
+			pthread_exit(NULL);  
 		}
 
 		frame_header.fin = raw_header[0] & 0x80;
@@ -329,9 +260,12 @@ ws_process_message(ws_connection_t *ws_connection) {
 		
 		if (frame_header.masked == 0 
 			|| frame_header.rsv != 0 
-		    || (ws_connection->message != NULL && frame_header.op_code != 0) ) {
+		    || (ws_connection->message != NULL && frame_header.op_code != 0)) {
+			handle_error(ws_connection, RCV_ERR_PROTOCOLL);
 			return RCV_ERR_PROTOCOLL;
 		}
+
+		if (ws_connection->close_sent == 1 && frame_header.op_code != OPCODE_CON_CLOSE) { return -42; }
 	
 		if (frame_header.payload_length == 126) {
 			payload_start = 8;
@@ -340,7 +274,7 @@ ws_process_message(ws_connection_t *ws_connection) {
 		}
 
 		if (recv_bytes(ws_connection->fd, raw_header + 2, payload_start - 2) < 0) {
-			return RCV_ERR_CONNECTION_LOST; 
+			pthread_exit(NULL); 
 		}
 		
 		if (frame_header.payload_length == 126) {
@@ -354,8 +288,8 @@ ws_process_message(ws_connection_t *ws_connection) {
 		}
 
 		if (frame_header.payload_length >= MAX_FRAME_SIZE_RCV) {
-			// server should reply with an error code indicating to close the connection because frame size is bigger than 1 MB
-			return RCV_ERR_PAYLOAD_SIZE; 
+			handle_error(ws_connection, RCV_ERR_PAYLOAD_SIZE);
+			return RCV_ERR_PAYLOAD_SIZE;
 		}
 
 		frame_header.mask[0] = raw_header[payload_start - 4]; 
@@ -379,23 +313,20 @@ ws_process_message(ws_connection_t *ws_connection) {
 				handle_data_frame(ws_connection, &frame_header);
 				break;
 			case OPCODE_CON_CLOSE:
-				handle_close_frame(NULL, NULL);
+				// response to sent close frame received, exit immediatly
+				if (ws_connection->close_sent == 1) {
+					pthread_exit(NULL);
+				}
 
-				return RCV_CON_CLOSE;
+				handle_close_frame(ws_connection, &frame_header);
 			case OPCODE_PING:
-				handle_ping_frame(NULL, NULL);
-
-				return RCV_PING;
+				handle_ping_frame(ws_connection, &frame_header);
+				break;
 			case OPCODE_PONG:
 				return RCV_PONG;
 			default:
 				return RCV_ERR_PROTOCOLL;
 		}
-
-
-
-
-
 
 		if (frame_header.fin) {
 			break;
@@ -427,17 +358,62 @@ handle_data_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_heade
 }
 
 static void handle_close_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header) {
-	return;
+	ws_connection->status = CLOSING;
+
+	uint8_t close_payload[40];
+	int close_payload_len;
+	uint8_t close_data[frame_header->payload_length];
+
+	if (recv_bytes(ws_connection->fd, close_data, frame_header->payload_length) < 0) {
+		pthread_exit(NULL);
+	}	
+
+	for (int i = 0; i < frame_header->payload_length; ++i) {
+		close_data[i] ^= frame_header->mask[i % 4];
+	}
+
+	if (frame_header->payload_length < 2) {
+		create_close_payload(1000, close_payload, &close_payload_len); 
+	} else {
+		uint16_t close_code = ws_connection->message[0] << 8 | ws_connection->message[1];
+
+		create_close_payload(close_code, close_payload, &close_payload_len); 
+	}
+
+	// connection has been properly closed ..
+	ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE);
+	pthread_exit(NULL);
 }
 
 static void handle_ping_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header) {
+	uint8_t ping_data[frame_header->payload_length];
+
+	if (recv_bytes(ws_connection->fd, ping_data, frame_header->payload_length) < 0) {
+		pthread_exit(NULL);
+	}	
+
+	for (int i = 0; i < frame_header->payload_length; ++i) {
+		ping_data[i] ^= frame_header->mask[i % 4];
+	}
 	
-	
-	return;
+	if (ws_send_message(ws_connection, ping_data, frame_header->payload_length, OPCODE_PONG) < 0) {
+		pthread_exit(NULL);
+	}
 }
 
+static void handle_error(ws_connection_t *ws_connection, int close_code) {
+	uint8_t close_payload[40];
+	int close_payload_len;	
 
+	create_close_payload(close_code, close_payload, &close_payload_len); 
 
+	if (ws_send_message(ws_connection, close_payload, close_payload_len, close_code) == -1) {
+		pthread_exit(NULL);
+	}
+
+	ws_connection->status = CLOSING;
+	ws_connection->close_sent = 1;
+}
 
 /**
  *  @brief		wrapper function to send UTF-8 encoded text                                                
@@ -468,6 +444,7 @@ static int
 ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t message_length, uint8_t message_type) {
 	if (connection == NULL 
 		|| connection->status == CONNECTING 
+		|| connection->status == CLOSED
 		|| (connection->status == CLOSING && connection->close_sent == 1)
 		|| (connection->status == CLOSING && message_type != OPCODE_CON_CLOSE)) { 
 		return -1;
@@ -656,7 +633,7 @@ static void build_accept_header(char *accept_header, char *sec_websocket_key) {
  *
  *  @param code					status code to be used	
  *  @param close_payload		array in which to store the payload
- *  @param close_reason_len		the length of the constructed payload
+ *  @param close_payload_len		the length of the constructed payload
  */
 void create_close_payload(int code, uint8_t *close_payload, int *close_payload_len) {
 	int i;
@@ -689,6 +666,7 @@ static void thread_cleanup_handler(void *arg) {
 	ws_connection_t *ws_connection = (ws_connection_t *) arg;
 
 	connections[ws_connection->thread_id] = NULL;
+	ws_connection->status = CLOSED;
 	if (ws_connection->message != NULL)	free(ws_connection->message); 
 	close(ws_connection->fd);
 	free(ws_connection);
