@@ -128,7 +128,7 @@ get_listener_socket(char *host_address, char *port) {
  *  @param fd               the file descriptor   
  *  @param mem              pointer to the memory region to store the received bytes 
  *  @param fetch_bytes      amount of bytes to fetch 
- *  @return                 0 if successful, or -1 in case the opposing site closed the underlying tcp connection, -2 any other error occured
+ *  @return                 0 if successful, or -1 in case the opposing site closed the underlying tcp connection, -2 if any other error occured
  * 
  */                                                            
 int 
