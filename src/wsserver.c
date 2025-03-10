@@ -192,11 +192,12 @@ ws_connection_thread(void *connection) {
 	for (;;) {
 		val = ws_process_message(ws_connection);
 		
-		// if (val == RCV_DATA && ws_connection->message_length > 0) {
 		if (val == RCV_DATA) {
 			on_message(ws_connection);
 		} 
-	
+		
+		//usleep(500000);
+
 		free(ws_connection->message);
 		ws_connection->message_length = 0; 
 		ws_connection->message = NULL;
@@ -277,7 +278,7 @@ ws_process_message(ws_connection_t *ws_connection) {
 		if (frame_header.masked == 0 
 			|| frame_header.rsv != 0 
 		    || (ws_connection->message != NULL && frame_header.op_code != 0)
-			|| (((frame_header.op_code & 0x08) == 0x08) && frame_header.payload_length > 125)
+			|| (((frame_header.op_code & 0x08) == 0x08) && (frame_header.payload_length > 125 || frame_header.fin == 0))
 		) {
 			handle_error(ws_connection, RCV_ERR_PROTOCOLL);
 			return RCV_ERR_PROTOCOLL;
@@ -350,6 +351,7 @@ ws_process_message(ws_connection_t *ws_connection) {
 				handle_pong_frame(ws_connection, &frame_header);
 				break;
 			default:
+				handle_error(ws_connection, RCV_ERR_PROTOCOLL);
 				return RCV_ERR_PROTOCOLL;
 		}
 
@@ -361,8 +363,6 @@ ws_process_message(ws_connection_t *ws_connection) {
 		}
 		printf("hit again\n");
 	}
-
-	
 
 	return RCV_DATA;
 }
@@ -387,7 +387,8 @@ handle_data_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_heade
 	ws_connection->message_length += frame_header->payload_length;
 }
 
-static void handle_close_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header) {
+static void 
+handle_close_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header) {
 	ws_connection->status = CLOSING;
 
 	uint8_t close_payload[40];
@@ -415,7 +416,8 @@ static void handle_close_frame(ws_connection_t *ws_connection, ws_frame_header_t
 	pthread_exit(NULL);
 }
 
-static void handle_ping_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header) {
+static void 
+handle_ping_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header) {
 	uint8_t ping_data[frame_header->payload_length];
 
 	if (recv_bytes(ws_connection->fd, ping_data, frame_header->payload_length) < 0) {
@@ -431,7 +433,8 @@ static void handle_ping_frame(ws_connection_t *ws_connection, ws_frame_header_t 
 	}
 }
 
-static void handle_pong_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header) {
+static void 
+handle_pong_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header) {
 	uint8_t pong_data[frame_header->payload_length];
 
 	if (recv_bytes(ws_connection->fd, pong_data, frame_header->payload_length) < 0) {
@@ -439,7 +442,8 @@ static void handle_pong_frame(ws_connection_t *ws_connection, ws_frame_header_t 
 	}
 }
 
-static void handle_error(ws_connection_t *ws_connection, int close_code) {
+static void 
+handle_error(ws_connection_t *ws_connection, int close_code) {
 	uint8_t close_payload[40];
 	int close_payload_len;	
 
@@ -449,10 +453,10 @@ static void handle_error(ws_connection_t *ws_connection, int close_code) {
 		pthread_exit(NULL);
 	}
 
+	
 	ws_connection->status = CLOSING;
 	ws_connection->close_sent = 1;
 }
-
 
 /**
  *  @brief		wrapper function to send UTF-8 encoded text                                                
