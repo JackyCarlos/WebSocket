@@ -35,14 +35,11 @@ static int con_count = 0, max_con = 10;
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
-
-
 static void handle_data_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header);
 static void handle_ping_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header);
 static void handle_close_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header);
 static void handle_error(ws_connection_t *ws_connection, int close_code);
-
-
+static void handle_pong_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header);
 
 enum handshake_headers {
 	HOST			= 128, 
@@ -184,25 +181,26 @@ ws_connection_thread(void *connection) {
 	}
 
 	ws_connection->status = OPEN;
-
+	
 	on_connection(connection);
-
+	
 	// 	0 if successful, -1 if the underlying socket got closed or an 
 	//  other error occured, -2 if the client sent an unmasked frame,
 	//  -3 if the client sent a message bigger than 64 KB  
 
 	int val;
 	for (;;) {
-		val = ws_process_message(ws_connection);		
+		val = ws_process_message(ws_connection);
 		
-		if (val == RCV_DATA && ws_connection->message_length > 0) {
+		// if (val == RCV_DATA && ws_connection->message_length > 0) {
+		if (val == RCV_DATA) {
 			on_message(ws_connection);
 		} 
-
+	
 		free(ws_connection->message);
 		ws_connection->message_length = 0; 
 		ws_connection->message = NULL;
-
+		
 	}
 
 	pthread_cleanup_pop(1);
@@ -242,14 +240,23 @@ ws_connection_thread(void *connection) {
 static int
 ws_process_message(ws_connection_t *ws_connection) {
 	ws_frame_header_t frame_header;
+	uint8_t raw_header[14];
 	int payload_start;
 
-	uint8_t raw_header[14];
-
 	for (;;) {
+		memset(&frame_header, 0, sizeof(ws_frame_header_t));
+		memset(raw_header, 0, 14);
+
 		if (recv_bytes(ws_connection->fd, raw_header, 2) < 0) {
 			pthread_exit(NULL);  
 		}
+
+		printf("Before Zuweisung\n");
+		printf("fin: %u\n", frame_header.fin);
+		printf("rsv: %u\n", frame_header.rsv);
+		printf("opcode: %u\n", frame_header.op_code);
+		printf("masked: %u\n", frame_header.masked);
+		printf("==================\n\n");
 
 		frame_header.fin = raw_header[0] & 0x80;
 		frame_header.rsv = raw_header[0] & 0x70;
@@ -257,13 +264,26 @@ ws_process_message(ws_connection_t *ws_connection) {
 		frame_header.masked = raw_header[1] & 0x80;	
 		frame_header.payload_length = raw_header[1] & 0x7F;
 		payload_start = 6;
-		
+
+		printf("DEBUG OUTPUT 1\n");
+		printf("fin: %u\n", frame_header.fin);
+		printf("rsv: %u\n", frame_header.rsv);
+		printf("opcode: %u\n", frame_header.op_code);
+		printf("masked: %u\n", frame_header.masked);
+		printf("==================\n\n");
+
+
+
 		if (frame_header.masked == 0 
 			|| frame_header.rsv != 0 
-		    || (ws_connection->message != NULL && frame_header.op_code != 0)) {
+		    || (ws_connection->message != NULL && frame_header.op_code != 0)
+			|| (((frame_header.op_code & 0x08) == 0x08) && frame_header.payload_length > 125)
+		) {
 			handle_error(ws_connection, RCV_ERR_PROTOCOLL);
 			return RCV_ERR_PROTOCOLL;
 		}
+
+		printf("DEBUG OUTPUT 2\n");
 
 		if (ws_connection->close_sent == 1 && frame_header.op_code != OPCODE_CON_CLOSE) { return -42; }
 	
@@ -272,6 +292,8 @@ ws_process_message(ws_connection_t *ws_connection) {
 		} else if (frame_header.payload_length == 127) {
 			payload_start = 14;
 		}
+
+		
 
 		if (recv_bytes(ws_connection->fd, raw_header + 2, payload_start - 2) < 0) {
 			pthread_exit(NULL); 
@@ -300,7 +322,7 @@ ws_process_message(ws_connection_t *ws_connection) {
 		switch (frame_header.op_code) {
 			case OPCODE_CONTINUATION: 
 				handle_data_frame(ws_connection, &frame_header);
-
+				
 				break;
 			case OPCODE_TEXT:
 				ws_connection->message_type = MESSAGE_TYPE_TXT;
@@ -323,16 +345,24 @@ ws_process_message(ws_connection_t *ws_connection) {
 				handle_ping_frame(ws_connection, &frame_header);
 				break;
 			case OPCODE_PONG:
-				return RCV_PONG;
+				printf("Hit Pong!\n\n\n\n\n");
+				
+				handle_pong_frame(ws_connection, &frame_header);
+				break;
 			default:
 				return RCV_ERR_PROTOCOLL;
 		}
 
-		if (frame_header.fin) {
+		printf("After switch case\n");
+
+		if (frame_header.fin && ((frame_header.op_code & 0x08) == 0)) {
+			printf("not hit!\n");
 			break;
 		}
-
+		printf("hit again\n");
 	}
+
+	
 
 	return RCV_DATA;
 }
@@ -375,7 +405,7 @@ static void handle_close_frame(ws_connection_t *ws_connection, ws_frame_header_t
 	if (frame_header->payload_length < 2) {
 		create_close_payload(1000, close_payload, &close_payload_len); 
 	} else {
-		uint16_t close_code = ws_connection->message[0] << 8 | ws_connection->message[1];
+		uint16_t close_code = close_data[0] << 8 | close_data[1];
 
 		create_close_payload(close_code, close_payload, &close_payload_len); 
 	}
@@ -401,6 +431,14 @@ static void handle_ping_frame(ws_connection_t *ws_connection, ws_frame_header_t 
 	}
 }
 
+static void handle_pong_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header) {
+	uint8_t pong_data[frame_header->payload_length];
+
+	if (recv_bytes(ws_connection->fd, pong_data, frame_header->payload_length) < 0) {
+		pthread_exit(NULL); 
+	}
+}
+
 static void handle_error(ws_connection_t *ws_connection, int close_code) {
 	uint8_t close_payload[40];
 	int close_payload_len;	
@@ -414,6 +452,7 @@ static void handle_error(ws_connection_t *ws_connection, int close_code) {
 	ws_connection->status = CLOSING;
 	ws_connection->close_sent = 1;
 }
+
 
 /**
  *  @brief		wrapper function to send UTF-8 encoded text                                                
