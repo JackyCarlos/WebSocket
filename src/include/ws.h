@@ -45,13 +45,14 @@ typedef struct {
 typedef struct {
 	uint32_t fd;
 	uint32_t status;
-	struct sockaddr_storage remote_addr;
-	int close_sent;
+	uint8_t close_sent;
 	uint8_t thread_id;
+	uint8_t processed_frames;
+	struct sockaddr_storage remote_addr;
 
 	uint8_t *message;
-	uint64_t message_length;
 	uint8_t message_type;
+	uint64_t message_length;
 } ws_connection_t;
 
 typedef struct {

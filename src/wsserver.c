@@ -131,6 +131,7 @@ ws_server_listener_thread(void *param) {
 		connection->remote_addr = remote_addr;
 		connection->message = NULL;
 		connection->message_length = 0;
+		connection->processed_frames = 0;
 		connection->close_sent = 0;
 
 		pthread_t new_thread;
@@ -200,8 +201,7 @@ ws_connection_thread(void *connection) {
 
 		free(ws_connection->message);
 		ws_connection->message_length = 0; 
-		ws_connection->message = NULL;
-		
+		ws_connection->message = NULL;	
 	}
 
 	pthread_cleanup_pop(1);
@@ -277,7 +277,9 @@ ws_process_message(ws_connection_t *ws_connection) {
 
 		if (frame_header.masked == 0 
 			|| frame_header.rsv != 0 
-		    || (ws_connection->message != NULL && frame_header.op_code != 0)
+			|| (((frame_header.op_code & 0x08) == 0) && 
+						((ws_connection->processed_frames == 0 && frame_header.op_code == 0) 
+					 || (ws_connection->processed_frames > 0 && frame_header.op_code != 0)))
 			|| (((frame_header.op_code & 0x08) == 0x08) && (frame_header.payload_length > 125 || frame_header.fin == 0))
 		) {
 			handle_error(ws_connection, RCV_ERR_PROTOCOLL);
@@ -369,6 +371,7 @@ ws_process_message(ws_connection_t *ws_connection) {
 
 static void
 handle_data_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header) {
+	ws_connection->processed_frames++;
 	if (ws_connection->message == NULL) {
 		ws_connection->message = (uint8_t *) malloc(frame_header->payload_length);
 	} else {
