@@ -197,7 +197,7 @@ ws_connection_thread(void *connection) {
 			on_message(ws_connection);
 		} 
 		
-		//usleep(500000);
+		usleep(200000);
 
 		free(ws_connection->message);
 		ws_connection->message_length = 0; 
@@ -245,8 +245,8 @@ ws_process_message(ws_connection_t *ws_connection) {
 	int payload_start;
 
 	for (;;) {
-		memset(&frame_header, 0, sizeof(ws_frame_header_t));
-		memset(raw_header, 0, 14);
+		// memset(&frame_header, 0, sizeof(ws_frame_header_t));
+		// memset(raw_header, 0, 14);
 
 		if (recv_bytes(ws_connection->fd, raw_header, 2) < 0) {
 			pthread_exit(NULL);  
@@ -282,8 +282,8 @@ ws_process_message(ws_connection_t *ws_connection) {
 					 || (ws_connection->processed_frames > 0 && frame_header.op_code != 0)))
 			|| (((frame_header.op_code & 0x08) == 0x08) && (frame_header.payload_length > 125 || frame_header.fin == 0))
 		) {
-			handle_error(ws_connection, RCV_ERR_PROTOCOLL);
-			return RCV_ERR_PROTOCOLL;
+			// close the tcp connection due to RCV_ERR_PROTOCOLL
+			pthread_exit(NULL); 
 		}
 
 		printf("DEBUG OUTPUT 2\n");
@@ -295,8 +295,6 @@ ws_process_message(ws_connection_t *ws_connection) {
 		} else if (frame_header.payload_length == 127) {
 			payload_start = 14;
 		}
-
-		
 
 		if (recv_bytes(ws_connection->fd, raw_header + 2, payload_start - 2) < 0) {
 			pthread_exit(NULL); 
@@ -353,8 +351,8 @@ ws_process_message(ws_connection_t *ws_connection) {
 				handle_pong_frame(ws_connection, &frame_header);
 				break;
 			default:
-				handle_error(ws_connection, RCV_ERR_PROTOCOLL);
-				return RCV_ERR_PROTOCOLL;
+				// close the tcp connection due to RCV_ERR_PROTOCOLL
+				pthread_exit(NULL);
 		}
 
 		printf("After switch case\n");
@@ -372,6 +370,7 @@ ws_process_message(ws_connection_t *ws_connection) {
 static void
 handle_data_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_header) {
 	ws_connection->processed_frames++;
+	
 	if (ws_connection->message == NULL) {
 		ws_connection->message = (uint8_t *) malloc(frame_header->payload_length);
 	} else {
@@ -455,7 +454,6 @@ handle_error(ws_connection_t *ws_connection, int close_code) {
 	if (ws_send_message(ws_connection, close_payload, close_payload_len, close_code) == -1) {
 		pthread_exit(NULL);
 	}
-
 	
 	ws_connection->status = CLOSING;
 	ws_connection->close_sent = 1;
@@ -710,6 +708,8 @@ static void init_connections(int start_pos) {
 
 static void thread_cleanup_handler(void *arg) {
 	ws_connection_t *ws_connection = (ws_connection_t *) arg;
+
+	printf("clean it up!\n");
 
 	connections[ws_connection->thread_id] = NULL;
 	ws_connection->status = CLOSED;
