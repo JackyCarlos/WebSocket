@@ -15,6 +15,7 @@
 #include "base64.h"
 #include "utils.h"
 #include "http.h"
+#include "utf8.h"
 
 static int ws_handshake(ws_connection_t *);
 static void build_accept_header(char *header, char *sec_websocket_key);
@@ -159,6 +160,8 @@ ws_server_listener_thread(void *param) {
 
 		connections[thread_pos] = connection;
 		con_count++;
+
+		DEBUG_PRINT("new connection. Thread ID %u\n", connection->thread_id);
 	}
 
 	return (void *) NULL;
@@ -252,28 +255,12 @@ ws_process_message(ws_connection_t *ws_connection) {
 			pthread_exit(NULL);  
 		}
 
-		printf("Before Zuweisung\n");
-		printf("fin: %u\n", frame_header.fin);
-		printf("rsv: %u\n", frame_header.rsv);
-		printf("opcode: %u\n", frame_header.op_code);
-		printf("masked: %u\n", frame_header.masked);
-		printf("==================\n\n");
-
 		frame_header.fin = raw_header[0] & 0x80;
 		frame_header.rsv = raw_header[0] & 0x70;
 		frame_header.op_code = raw_header[0] & 0x0F;
 		frame_header.masked = raw_header[1] & 0x80;	
 		frame_header.payload_length = raw_header[1] & 0x7F;
 		payload_start = 6;
-
-		printf("DEBUG OUTPUT 1\n");
-		printf("fin: %u\n", frame_header.fin);
-		printf("rsv: %u\n", frame_header.rsv);
-		printf("opcode: %u\n", frame_header.op_code);
-		printf("masked: %u\n", frame_header.masked);
-		printf("==================\n\n");
-
-
 
 		if (frame_header.masked == 0 
 			|| frame_header.rsv != 0 
@@ -285,8 +272,6 @@ ws_process_message(ws_connection_t *ws_connection) {
 			// close the tcp connection due to RCV_ERR_PROTOCOLL
 			pthread_exit(NULL); 
 		}
-
-		printf("DEBUG OUTPUT 2\n");
 
 		if (ws_connection->close_sent == 1 && frame_header.op_code != OPCODE_CON_CLOSE) { return -42; }
 	
@@ -346,8 +331,6 @@ ws_process_message(ws_connection_t *ws_connection) {
 				handle_ping_frame(ws_connection, &frame_header);
 				break;
 			case OPCODE_PONG:
-				printf("Hit Pong!\n\n\n\n\n");
-				
 				handle_pong_frame(ws_connection, &frame_header);
 				break;
 			default:
@@ -355,13 +338,14 @@ ws_process_message(ws_connection_t *ws_connection) {
 				pthread_exit(NULL);
 		}
 
-		printf("After switch case\n");
-
 		if (frame_header.fin && ((frame_header.op_code & 0x08) == 0)) {
-			printf("not hit!\n");
+
+			//is_valid_utf8(const uint8_t *data, size_t len)
+			if (ws_connection->message_type == MESSAGE_TYPE_TXT && !is_valid_utf8(ws_connection->message, ws_connection->message_length)) {
+				pthread_exit(NULL);
+			}
 			break;
 		}
-		printf("hit again\n");
 	}
 
 	return RCV_DATA;
@@ -534,13 +518,15 @@ ws_send_message(ws_connection_t *connection, uint8_t *message_bytes, uint64_t me
 
 		// send frame header
 		if (send(connection->fd, frame_header, header_len, 0) == -1) {
-			//perror("socket send");
+			perror("socket send");
+			pthread_mutex_unlock(&lock);
 			return -1;
 		}
 
 		// send frame payload; 
 		if (send(connection->fd, message_bytes, payload_len, 0) == -1) {
-			//perror("socket send");
+			perror("socket send");
+			pthread_mutex_unlock(&lock);
 			return -1;
 		}
 
@@ -708,8 +694,7 @@ static void init_connections(int start_pos) {
 
 static void thread_cleanup_handler(void *arg) {
 	ws_connection_t *ws_connection = (ws_connection_t *) arg;
-
-	printf("clean it up!\n");
+	DEBUG_PRINT("connection for thread with id %u terminated\n", ws_connection->thread_id);
 
 	connections[ws_connection->thread_id] = NULL;
 	ws_connection->status = CLOSED;
