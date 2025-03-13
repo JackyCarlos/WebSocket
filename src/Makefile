@@ -1,9 +1,9 @@
 CC          = gcc
 CFLAGS      = -Wall
 LDFLAGS     = -lpthread
-OBJFILES    = main.o wsserver.o http/http.o utils/utils.o sha1/sha1.o base64/base64.o
+OBJFILES    = main.o wsserver.o utf8/utf8.o http/http.o utils/utils.o sha1/sha1.o base64/base64.o
 TARGET      = wsserver
-INC         = -I ./include -I ./sha1 -I ./base64 -I ./utils -I ./http
+INC         = -I ./include -I ./sha1 -I ./base64 -I ./utils -I ./http -I ./utf8
 OBJDIR      = obj
 SRCDIR      = src
 DEBUGFLAGS  = -DDEBUG_MODE -g
@@ -33,6 +33,9 @@ base64.o: base64/base64.c
 
 utils.o: utils/utils.c 
 	$(CC) $(INC) $(CFLAGS) -c utils/utils.c
+
+utf8.o: utf8/utf8.c 
+	$(CC) $(INC) $(CFLAGS) -c utf8/utf8.c
 
 clean:
 	rm -f $(OBJFILES) $(TARGET) *~
