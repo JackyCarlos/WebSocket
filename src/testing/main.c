@@ -1,3 +1,15 @@
+/***************************************************************************//**
+
+  @file         main.c
+
+  @author       Robert Eikmanns
+
+  @date         Thursday, 14 March 2025
+
+  @brief        main.c file for testing with autobahn
+
+*******************************************************************************/
+
 #include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -5,13 +17,8 @@
 #include "ws.h"
 
 void on_connection(ws_connection_t *connection) {
-    printf("New connection established!\n");
+    return;
 }
-
-// void on_message(ws_connection_t *ws_connection) {
-//     printf("got text message: %.*s\n", (int) ws_connection->message_length, (char *) ws_connection->message);
-
-// }
 
 void on_message(ws_connection_t *ws_connection) {
     if (ws_connection->message_type == MESSAGE_TYPE_TXT) {
