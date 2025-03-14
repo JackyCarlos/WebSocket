@@ -4,7 +4,7 @@
 
   @author       Robert Eikmanns
 
-  @date         Thursday, 7 March 2024
+  @date         Thursday, 14 March 2025
 
   @brief        core functionalities of the websocket server
 
@@ -207,8 +207,6 @@ ws_connection_thread(void *connection) {
 		if (val == RCV_DATA) {
 			on_message(ws_connection);
 		} 
-		
-		//usleep(200000);
 
 		free(ws_connection->message);
 		ws_connection->message_length = 0; 
@@ -368,7 +366,6 @@ handle_data_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_heade
 		pthread_exit(NULL);
 	}
 
-	// to be put in a separate function
 	for (int i = 0; i < frame_header->payload_length; ++i) {
 		ws_connection->message[i + ws_connection->message_length] ^= frame_header->mask[i % 4];
 	}
