@@ -62,12 +62,16 @@ enum message_return_codes {
 };
 
 websocket_status_code_t websocket_close_codes[] = {
-	{ 1000, "normal closure" },
 	{ 1001, "going away" },
 	{ 1002, "protocol error" },
 	{ 1007, "data not consistent" },
 	{ 1009, "message too big to process" },
-	{ 1011, "unexpected serverside condition" }
+	{ 1011, "unexpected serverside condition" },
+	{ 1000, "normal closure" },
+};
+
+uint16_t invalid_close_codes[] = {
+	0, 999, 1004, 1005, 1006, 1016, 1100, 2000, 2999
 };
 
 /**
@@ -204,7 +208,7 @@ ws_connection_thread(void *connection) {
 			on_message(ws_connection);
 		} 
 		
-		usleep(200000);
+		//usleep(200000);
 
 		free(ws_connection->message);
 		ws_connection->message_length = 0; 
@@ -388,16 +392,23 @@ handle_close_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_head
 		close_data[i] ^= frame_header->mask[i % 4];
 	}
 
-	if(!is_valid_utf8(close_data, frame_header->payload_length)) {
-		pthread_exit(NULL);
-	} 
-
 	if (frame_header->payload_length == 0) {
 		create_close_payload(1000, close_payload, &close_payload_len); 
 	} else if (frame_header->payload_length == 1) {
 		create_close_payload(1002, close_payload, &close_payload_len); 
 	} else {
+		if(!is_valid_utf8(close_data + 2, frame_header->payload_length - 2)) {
+			pthread_exit(NULL);
+		} 
 		uint16_t close_code = close_data[0] << 8 | close_data[1];
+
+		int invalid_close_codes_size = sizeof(invalid_close_codes) / sizeof(uint16_t);
+		for (int i = 0; i < invalid_close_codes_size; ++i) {
+			if (invalid_close_codes[i] == close_code) { 
+				close_code = 1002;
+				break; 
+			}
+		} 
 
 		DEBUG_PRINT("Using code %u to close connection\n", close_code);
 		create_close_payload(close_code, close_payload, &close_payload_len); 
@@ -405,6 +416,7 @@ handle_close_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_head
 
 	// connection has been properly closed ..
 	ws_send_message(ws_connection, close_payload, close_payload_len, OPCODE_CON_CLOSE);
+
 	pthread_exit(NULL);
 }
 
@@ -669,7 +681,7 @@ static void build_accept_header(char *accept_header, char *sec_websocket_key) {
  *
  *  @param code					status code to be used	
  *  @param close_payload		array in which to store the payload
- *  @param close_payload_len		the length of the constructed payload
+ *  @param close_payload_len	the length of the constructed payload
  */
 void create_close_payload(int code, uint8_t *close_payload, int *close_payload_len) {
 	int i;
