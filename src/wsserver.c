@@ -173,8 +173,12 @@ ws_connection_thread(void *connection) {
 
 	ws_connection_t *ws_connection = (ws_connection_t *) connection;
 	int status;
+	struct linger sl;
 
 	status = -1;
+	sl.l_onoff = 1;
+	sl.l_linger = 2;
+	setsockopt(ws_connection->fd, SOL_SOCKET, SO_LINGER, &sl, sizeof(sl));
 	
 	while (status != 0) {
 		status = ws_handshake(connection);
@@ -248,9 +252,6 @@ ws_process_message(ws_connection_t *ws_connection) {
 	int payload_start;
 
 	for (;;) {
-		// memset(&frame_header, 0, sizeof(ws_frame_header_t));
-		// memset(raw_header, 0, 14);
-
 		if (recv_bytes(ws_connection->fd, raw_header, 2) < 0) {
 			pthread_exit(NULL);  
 		}
@@ -339,8 +340,6 @@ ws_process_message(ws_connection_t *ws_connection) {
 		}
 
 		if (frame_header.fin && ((frame_header.op_code & 0x08) == 0)) {
-
-			//is_valid_utf8(const uint8_t *data, size_t len)
 			if (ws_connection->message_type == MESSAGE_TYPE_TXT && !is_valid_utf8(ws_connection->message, ws_connection->message_length)) {
 				pthread_exit(NULL);
 			}
@@ -389,11 +388,14 @@ handle_close_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_head
 		close_data[i] ^= frame_header->mask[i % 4];
 	}
 
-	if (frame_header->payload_length < 2) {
+	if (frame_header->payload_length == 0) {
 		create_close_payload(1000, close_payload, &close_payload_len); 
+	} else if (frame_header->payload_length == 1) {
+		create_close_payload(1002, close_payload, &close_payload_len); 
 	} else {
 		uint16_t close_code = close_data[0] << 8 | close_data[1];
 
+		DEBUG_PRINT("Using code %u to close connection\n", close_code);
 		create_close_payload(close_code, close_payload, &close_payload_len); 
 	}
 
@@ -695,10 +697,19 @@ static void init_connections(int start_pos) {
 static void thread_cleanup_handler(void *arg) {
 	ws_connection_t *ws_connection = (ws_connection_t *) arg;
 	DEBUG_PRINT("connection for thread with id %u terminated\n", ws_connection->thread_id);
+	
+	shutdown(ws_connection->fd, SHUT_WR);
+
+	uint8_t temp[65536];
+	ssize_t bytes_read;
+	while ((bytes_read = recv(ws_connection->fd, temp, sizeof(temp), 0)) > 0) {
+		;
+	}
 
 	connections[ws_connection->thread_id] = NULL;
 	ws_connection->status = CLOSED;
 	if (ws_connection->message != NULL)	free(ws_connection->message); 
+
 	close(ws_connection->fd);
 	free(ws_connection);
 }
