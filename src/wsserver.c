@@ -388,6 +388,10 @@ handle_close_frame(ws_connection_t *ws_connection, ws_frame_header_t *frame_head
 		close_data[i] ^= frame_header->mask[i % 4];
 	}
 
+	if(!is_valid_utf8(close_data, frame_header->payload_length)) {
+		pthread_exit(NULL);
+	} 
+
 	if (frame_header->payload_length == 0) {
 		create_close_payload(1000, close_payload, &close_payload_len); 
 	} else if (frame_header->payload_length == 1) {
