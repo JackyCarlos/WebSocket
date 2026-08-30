@@ -1,0 +1,15 @@
+{
+  "outdir": "./reports/servers",
+  "servers": [
+    {
+      "url": "ws://localhost:9999",
+      "options": {
+        "version": 18
+      }
+    }
+  ],
+  "cases": ["*"],
+
+  "exclude-cases": ["9.*", "12.*", "13.*"],
+  "exclude-agent-cases": {}
+}
