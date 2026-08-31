@@ -90,9 +90,27 @@ int main() {
 }
 ```
 
+## Implementation
+
+The server is implemented directly on top of TCP sockets without relying in an external WebSocket library. Each accepted client connection is represented by a `ws_connection_t` handle. And each client connection is handled in a separate thread. The connection thread performs the websocket handshake and subsequently processes incoming WebSocket frames for the lifetime of the connection.
+
+### Opening Handshake 🤝
+
+Before WebSocket communication can begin, the server performs an HTTP-based opening handshake. The incoming HTTP request, containing a header indicating the client's intention to switch protocols (`Upgrade: websocket`), is parsed and the client's `Sec-WebSocket-Key` value is combined with the WebSocket GUID. The resulting value is hashed with SHA-1 and Base64 encoded to generate the `Sec-WebSocket-Accept` response header. The server then responds with an `HTTP 101 Switching Protocols` response, completing the protocol upgrade. In doing so, the implementation makes use of implementations of Base64 and SHA-1 included in the project.
+
+<Bild>
+
+### Frame processing
+
+After the handshake, communication is handled using websocket frames. Incoming frame headers are parsed to determine the opcode, payload length, masking information and fragmentation state. Client payloads are unmasked before being processed by the application.
+
+Websocket messages may consist of a single frame or multiple fragmented frames. Fragmented messages are reconstructed and, in the case of text messages, validated for correct UTF-8 encoding before they are passed to the application through `on_message()`.
+
+Control frames are handled separately from application data. `Ping` frames are answered with the corresponding `Pong` frame, while `Close` frames initiate connection termination.
+
 ## Protocol Compliance
 
-The websocket protocol compliance is tested using the [autobahn-testsuite](https://github.com/crossbario/autobahn-testsuite/tree/b79698ff02cb967e1ed89ba730cf29a52d6b3f3d). The test suite checks wether the server implementation is compliant to RFC6455. Big thanks to [oberstet](https://github.com/oberstet) for this awesome testing tool.
+The websocket protocol compliance is tested using the [autobahn-testsuite](https://github.com/crossbario/autobahn-testsuite/tree/b79698ff02cb967e1ed89ba730cf29a52d6b3f3d). The test suite checks whether the server implementation is compliant to RFC6455. Big thanks to [oberstet](https://github.com/oberstet) for this awesome testing tool.
 
 First, build and start the test server:
 
@@ -119,7 +137,7 @@ docker run -it --rm \
     wstest -m fuzzingclient -s /config/fuzzingclient.json
 ```
 
-The test configuration is located at `testing/config/fuzzingclient.json`. The websocket implementation is testet against all test cases execept the limits/performance and compression test cases. After the test suite has finished, the generated report can be found at `testing/reports/servers/index.html`. Open the report in a browser to inspect the results of the individual WebSocket protocol test cases.
+The test configuration is located at `testing/config/fuzzingclient.json`. The websocket implementation is tested against all test cases except the limits/performance and compression test cases. After the test suite has finished, the generated report can be found at `testing/reports/servers/index.html`. Open the report in a browser to inspect the results of the individual WebSocket protocol test cases.
 
 ## Building
 
