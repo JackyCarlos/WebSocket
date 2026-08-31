@@ -1,41 +1,74 @@
-CC          = gcc
-CFLAGS      = -Wall
-LDFLAGS     = -lpthread
-OBJFILES    = main.o wsserver.o utf8/utf8.o http/http.o utils/utils.o sha1/sha1.o base64/base64.o
-TARGET      = wsserver
-INC         = -I ./include -I ./sha1 -I ./base64 -I ./utils -I ./http -I ./utf8
-OBJDIR      = obj
-SRCDIR      = src
-DEBUGFLAGS  = -DDEBUG_MODE -g
+CC = gcc
+AR = ar
 
-all: $(TARGET)
+CFLAGS     = -Wall
+DEBUGFLAGS = -DDEBUG_MODE -g
 
-$(TARGET): $(OBJFILES)
-	$(CC) $(INC) $(CFLAGS) -o $(TARGET) $(OBJFILES) $(LDFLAGS)
+INC = -I ./include \
+      -I ./sha1 \
+      -I ./base64 \
+      -I ./utils \
+      -I ./http \
+      -I ./utf8
 
-debug: CFLAGS += $(DEBUGFLAGS)
-debug: $(TARGET)
+LDFLAGS = -lpthread
 
-main.o: main.c 
-	$(CC) $(INC) $(CFLAGS) -c main.c
+SOURCES = wsserver.c \
+          utf8/utf8.c \
+          http/http.c \
+          utils/utils.c \
+          sha1/sha1.c \
+          base64/base64.c
 
-http.o: http/http.c 
-	$(CC) $(INC) $(CFLAGS) -c http/http.c
+OBJFILES = wsserver.o \
+           utf8/utf8.o \
+           http/http.o \
+           utils/utils.o \
+           sha1/sha1.o \
+           base64/base64.o
 
-wsserver.o: wsserver.c 
-	$(CC) $(INC) $(CFLAGS) -c wsserver.c
+LIB = libwsserver.a
 
-sha1.o: sha1/sha1.c 
-	$(CC) $(INC) $(CFLAGS) -c sha1/sha1.c
+AUTOBahn_TARGET = testing/autobahn-server
 
-base64.o: base64/base64.c 
-	$(CC) $(INC) $(CFLAGS) -c base64/base64.c
 
-utils.o: utils/utils.c 
-	$(CC) $(INC) $(CFLAGS) -c utils/utils.c
+all: $(LIB)
 
-utf8.o: utf8/utf8.c 
-	$(CC) $(INC) $(CFLAGS) -c utf8/utf8.c
+
+$(LIB): $(OBJFILES)
+	$(AR) rcs $@ $^
+
+
+autobahn-test:
+	$(CC) $(INC) $(CFLAGS) $(DEBUGFLAGS) \
+		testing/main.c $(SOURCES) \
+		-o $(AUTOBahn_TARGET) \
+		$(LDFLAGS)
+
+
+wsserver.o: wsserver.c
+	$(CC) $(INC) $(CFLAGS) -c $< -o $@
+
+http/http.o: http/http.c
+	$(CC) $(INC) $(CFLAGS) -c $< -o $@
+
+utils/utils.o: utils/utils.c
+	$(CC) $(INC) $(CFLAGS) -c $< -o $@
+
+sha1/sha1.o: sha1/sha1.c
+	$(CC) $(INC) $(CFLAGS) -c $< -o $@
+
+base64/base64.o: base64/base64.c
+	$(CC) $(INC) $(CFLAGS) -c $< -o $@
+
+utf8/utf8.o: utf8/utf8.c
+	$(CC) $(INC) $(CFLAGS) -c $< -o $@
+
 
 clean:
-	rm -f $(OBJFILES) $(TARGET) *~
+	rm -f $(OBJFILES) \
+	      $(LIB) \
+	      $(AUTOBahn_TARGET)
+
+
+.PHONY: all autobahn-test clean
