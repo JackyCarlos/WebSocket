@@ -209,7 +209,7 @@ ws_connection_thread(void *connection) {
 		} 
 
 		free(ws_connection->message);
-		ws_connection->message_length = 0; 
+		ws_connection->message_length = ws_connection->processed_frames = 0; 
 		ws_connection->message = NULL;	
 	}
 
@@ -217,8 +217,8 @@ ws_connection_thread(void *connection) {
 
 	return (void *) NULL;
 }
-
-/*      0                   1                   2                   3
+/*
+      0                   1                   2                   3
       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
      +-+-+-+-+-------+-+-------------+-------------------------------+
      |F|R|R|R| opcode|M| Payload len |    Extended payload length    |
