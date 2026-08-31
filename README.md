@@ -61,7 +61,12 @@ void on_message(ws_connection_t *ws_connection)
     unsigned short port = ntohs(addr->sin_port);
 
     if (ws_connection->message_type == MESSAGE_TYPE_TXT) {
-        printf("client from %s:%hu sent a message: %.*s\n", ip, port, ws_connection->message_length, ws_connection->message);
+        printf("Client from %s:%hu sent a message: %.*s\n",
+            ip,
+            port,
+            ws_connection->message_length,
+            ws_connection->message
+        );
     }
 }
 
