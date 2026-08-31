@@ -1,8 +1,19 @@
 # WebSocket &#x1F50C;
 
-websocket server implementation compliant to [RFC6455](https://www.rfc-editor.org/rfc/rfc6455.html)
+A WebSocket server library written in C compliant to [RFC6455](https://www.rfc-editor.org/rfc/rfc6455.html). The project provides an event-driven API and supports multiple concurrent client connections. The WebSocket protocol implementation, including the opening handshake and frame processing, is implemented without relying on an external WebSocket library.
 
-## API
+## Features
+
+- RFC 6455 WebSocket server implementation
+- Text and binary messages
+- Fragmented messages
+- Ping/Pong and Close control frames
+- Concurrent client connections
+- Event-driven API
+- UTF-8 validation
+- Protocol compliance tested with Autobahn
+
+## API / Usage
 
 The library provides an event-driven API for implementing WebSocket servers. Applications react to connection, message, and disconnection events by implementing the corresponding callbacks.
 
@@ -61,7 +72,7 @@ void on_message(ws_connection_t *ws_connection)
     unsigned short port = ntohs(addr->sin_port);
 
     if (ws_connection->message_type == MESSAGE_TYPE_TXT) {
-        printf("Client from %s:%hu sent a message: %.*s\n",
+        printf("client from %s:%hu sent a message: %.*s\n",
             ip,
             port,
             ws_connection->message_length,
@@ -78,3 +89,81 @@ int main() {
     return 0;
 }
 ```
+
+## Protocol Compliance
+
+The websocket protocol compliance is tested using the [autobahn-testsuite](https://github.com/crossbario/autobahn-testsuite/tree/b79698ff02cb967e1ed89ba730cf29a52d6b3f3d). The test suite checks wether the server implementation is compliant to RFC6455. Big thanks to [oberstet](https://github.com/oberstet) for this awesome testing tool.
+
+First, build and start the test server:
+
+```bash
+make autobahn-test
+./testing/autobahn-server
+```
+
+The test server runs on the host and is configured as an echo server for the autobahn tests. In a second terminal, change into the testing directory and create the report directory:
+
+```bash
+cd testing
+mkdir -p reports
+```
+
+Run the autobahn fuzzing client using Docker:
+
+```bash
+docker run -it --rm \
+    --network host \
+    -v "$(pwd)/config:/config" \
+    -v "$(pwd)/reports:/reports" \
+    crossbario/autobahn-testsuite:latest \
+    wstest -m fuzzingclient -s /config/fuzzingclient.json
+```
+
+The test configuration is located at `testing/config/fuzzingclient.json`. The websocket implementation is testet against all test cases execept the limits/performance and compression test cases. After the test suite has finished, the generated report can be found at `testing/reports/servers/index.html`. Open the report in a browser to inspect the results of the individual WebSocket protocol test cases.
+
+## Building
+
+Build the library using:
+
+```bash
+make
+```
+
+This creates the static library:
+
+```bash
+libwsserver.a
+```
+
+To use the library in another C project, include the public header:
+
+```c
+#include "ws.h"
+```
+
+Assuming the WebSocket repository is located inside your project:
+
+```text
+my-project/
+├── main.c
+└── WebSocket/
+    ├── include/
+    │   └── ws.h
+    └── libwsserver.a
+```
+
+link against `libwsserver.a`:
+
+```zsh
+gcc main.c \
+    -I./WebSocket/include \
+    -L./WebSocket \
+    -lwsserver \
+    -lpthread \
+    -o server
+```
+
+## Limitations
+
+- No TLS / wss support
+- websocket extensions are not supported
