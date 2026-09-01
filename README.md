@@ -59,33 +59,64 @@ connection->message_length      // length of the received message
 #include <netinet/in.h>
 #include "ws.h"
 
+void get_client_address(
+    ws_connection_t *ws_connection,
+    char *ip,
+    size_t ip_size,
+    unsigned short *port
+) {
+    struct sockaddr_in *addr =
+        (struct sockaddr_in *)&ws_connection->remote_addr;
+
+    inet_ntop(AF_INET, &addr->sin_addr, ip, ip_size);
+    *port = ntohs(addr->sin_port);
+}
+
 void on_connection(ws_connection_t *connection) {
-    printf("somebody connected to the server :)\n");
-    return;
+    char ip[INET_ADDRSTRLEN];
+    unsigned short port;
+
+    get_client_address(connection, ip, sizeof(ip), &port);
+
+    printf("%s:%hu has connected\n", ip, port);
 }
 
 void on_message(ws_connection_t *ws_connection)
 {
-    struct sockaddr_in *addr = (struct sockaddr_in *)&ws_connection->remote_addr;
     char ip[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &addr->sin_addr, ip, sizeof(ip));
-    unsigned short port = ntohs(addr->sin_port);
+    unsigned short port;
+
+    get_client_address(ws_connection, ip, sizeof(ip), &port);
 
     if (ws_connection->message_type == MESSAGE_TYPE_TXT) {
-        printf("client from %s:%hu sent a message: %.*s\n",
+        printf(
+            "Client from %s:%hu sent a message: %.*s\n",
             ip,
             port,
             ws_connection->message_length,
             ws_connection->message
         );
     }
+
+    send_ws_message_txt(ws_connection, (uint8_t *) "Thank you for your message", 26);
+}
+
+void on_close(ws_connection_t *ws_connection) {
+    char ip[INET_ADDRSTRLEN];
+    unsigned short port;
+
+    get_client_address(ws_connection, ip, sizeof(ip), &port);
+
+    printf("%s:%hu has disconnected\n", ip, port);
 }
 
 int main() {
     printf("firing up server!\n");
-    ws_server("localhost", "1312");
+
+    ws_server("localhost", "9999");
 
     pthread_exit(NULL);
+
     return 0;
 }
 ```
