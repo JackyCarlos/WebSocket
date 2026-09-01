@@ -721,8 +721,16 @@ static void thread_cleanup_handler(void *arg) {
 
 	connections[ws_connection->thread_id] = NULL;
 	ws_connection->status = CLOSED;
-	if (ws_connection->message != NULL)	free(ws_connection->message); 
+
+	if (ws_connection->message != NULL) {
+		free(ws_connection->message);
+		ws_connection->message = NULL;
+	}	
 
 	close(ws_connection->fd);
+	ws_connection->fd = -1;
+
+	on_close(ws_connection);
+
 	free(ws_connection);
 }
