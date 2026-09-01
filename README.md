@@ -54,6 +54,8 @@ connection->message_length      // length of the received message
 
 ### Minimal example
 
+This minimal example server informs the user when a client connects. For that it prints a message containing the clients ip address and the used port. The server then prints every text message it receives from the client and responds with a static thank you note. In case the client closes the websocket connection the server again informs the user by printing a message containing the clients ip address and the used port. 
+
 ```c
 #include <arpa/inet.h>
 #include <netinet/in.h>
