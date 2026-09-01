@@ -16,3 +16,5 @@ while True:
         print("received data:", frame.data)
     else:
         ws.send(inp)
+        response = ws.recv()
+        print("server:", response)
