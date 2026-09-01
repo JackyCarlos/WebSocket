@@ -42,6 +42,10 @@ void on_message(ws_connection_t *ws_connection) {
     }
 }
 
+void on_close(ws_connection_t *ws_connection) {
+    ;
+}
+
 int main() {
     //signal(SIGPIPE, SIG_IGN);
     ws_server("localhost", "9999");
