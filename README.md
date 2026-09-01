@@ -108,7 +108,7 @@ Websocket messages may consist of a single frame or multiple fragmented frames. 
 
 Control frames are handled separately from application data. `Ping` frames are answered with the corresponding `Pong` frame, while `Close` frames initiate connection termination.
 
-## Protocol Compliance
+## Protocol Compliance ✔️
 
 The websocket protocol compliance is tested using the [autobahn-testsuite](https://github.com/crossbario/autobahn-testsuite/tree/b79698ff02cb967e1ed89ba730cf29a52d6b3f3d). The test suite checks whether the server implementation is compliant to RFC6455. Big thanks to [oberstet](https://github.com/oberstet) for this awesome testing tool.
 
@@ -139,7 +139,7 @@ docker run -it --rm \
 
 The test configuration is located at `testing/config/fuzzingclient.json`. The websocket implementation is tested against all test cases except the limits/performance and compression test cases. After the test suite has finished, the generated report can be found at `testing/reports/servers/index.html`. Open the report in a browser to inspect the results of the individual WebSocket protocol test cases.
 
-## Building
+## Building 🏗️
 
 Build the library using:
 
