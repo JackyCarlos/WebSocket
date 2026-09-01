@@ -58,3 +58,4 @@ src/sha1/sha1sum*
 .vscode
 autobahn-server
 src/testing/reports/
+.venv/
